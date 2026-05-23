@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { booksClient } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
+type Tab = 'active' | 'history';
+
 interface Loan {
   loanId: string; ISBN: string; bookTitle: string; bookAuthor: string;
   checkoutDate: string; returnDueDate: string; returnedDate?: string;
@@ -52,6 +54,7 @@ export function MyLoansPage() {
   const [loading, setLoading] = useState(true);
   const [returning, setReturning] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [tab, setTab] = useState<Tab>('active');
 
   useEffect(() => {
     if (!user) return;
@@ -88,20 +91,50 @@ export function MyLoansPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-serif font-bold text-stone-900 mb-6">My Loans</h1>
+      <h1 className="text-2xl font-serif font-bold text-stone-900 mb-5">My Loans</h1>
 
       {message && (
         <div className="bg-green-50 text-green-800 px-4 py-2 rounded-lg text-sm mb-4">{message}</div>
       )}
 
-      {/* Active loans */}
-      <section className="mb-8">
-        <h2 className="text-sm font-semibold text-stone-500 uppercase tracking-wide mb-3">
-          Active {active.length > 0 && `(${active.length})`}
-        </h2>
+      {/* Tabs */}
+      <div className="flex border-b border-stone-200 mb-5">
+        <button
+          onClick={() => setTab('active')}
+          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            tab === 'active'
+              ? 'border-brand-600 text-brand-700'
+              : 'border-transparent text-stone-500 hover:text-stone-800'
+          }`}
+        >
+          Active
+          {active.length > 0 && (
+            <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${tab === 'active' ? 'bg-brand-100 text-brand-700' : 'bg-stone-100 text-stone-500'}`}>
+              {active.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('history')}
+          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            tab === 'history'
+              ? 'border-brand-600 text-brand-700'
+              : 'border-transparent text-stone-500 hover:text-stone-800'
+          }`}
+        >
+          History
+          {history.length > 0 && (
+            <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${tab === 'history' ? 'bg-brand-100 text-brand-700' : 'bg-stone-100 text-stone-500'}`}>
+              {history.length}
+            </span>
+          )}
+        </button>
+      </div>
 
-        {active.length === 0 ? (
-          <div className="bg-white rounded-xl border border-stone-100 p-8 text-center text-stone-400">
+      {/* Active tab */}
+      {tab === 'active' && (
+        active.length === 0 ? (
+          <div className="bg-white rounded-xl border border-stone-100 p-10 text-center text-stone-400">
             <p>No active loans.</p>
             <Link to="/" className="text-brand-600 hover:underline text-sm mt-2 inline-block">Browse books</Link>
           </div>
@@ -114,14 +147,12 @@ export function MyLoansPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-stone-900">{loan.bookTitle}</p>
                   <p className="text-sm text-stone-500 mb-2">{loan.bookAuthor}</p>
-
                   <div className="flex flex-wrap items-center gap-2">
                     <RenewalBadge loan={loan} />
                     {loan.renewalCount > 0 && (
                       <span className="text-xs text-brand-600 font-medium">Renewed once</span>
                     )}
                   </div>
-
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-stone-400">
                     <span>Checked out {new Date(loan.checkoutDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     <span>·</span>
@@ -135,16 +166,19 @@ export function MyLoansPage() {
               </div>
             ))}
           </div>
-        )}
-      </section>
+        )
+      )}
 
-      {/* History */}
-      {history.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-stone-500 uppercase tracking-wide mb-3">History ({history.length})</h2>
+      {/* History tab */}
+      {tab === 'history' && (
+        history.length === 0 ? (
+          <div className="bg-white rounded-xl border border-stone-100 p-10 text-center text-stone-400">
+            <p>No borrowing history yet.</p>
+          </div>
+        ) : (
           <div className="space-y-2">
             {history.map(loan => (
-              <div key={loan.loanId} className="bg-white rounded-xl border border-stone-100 p-4 flex items-center gap-4 opacity-70">
+              <div key={loan.loanId} className="bg-white rounded-xl border border-stone-100 p-4 flex items-center gap-4">
                 <div className="text-2xl">📗</div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-stone-700 text-sm truncate">{loan.bookTitle}</p>
@@ -161,7 +195,7 @@ export function MyLoansPage() {
               </div>
             ))}
           </div>
-        </section>
+        )
       )}
     </div>
   );
