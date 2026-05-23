@@ -1,0 +1,252 @@
+service: library-books
+frameworkVersion: '3'
+useDotenv: true
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ca-west-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 15
+  environment:
+    NODE_ENV: ${self:provider.stage}
+    JWT_SECRET: ${env:JWT_SECRET}
+    DYNAMO_TABLE: ${env:DYNAMO_TABLE, 'library-dev'}
+    CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:5173'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:TransactWriteItems
+          Resource:
+            - arn:aws:dynamodb:ca-west-1:*:table/${env:DYNAMO_TABLE, 'library-dev'}
+            - arn:aws:dynamodb:ca-west-1:*:table/${env:DYNAMO_TABLE, 'library-dev'}/index/*
+
+resources:
+  Resources:
+    LibraryTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${env:DYNAMO_TABLE, 'library-dev'}
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+          - AttributeName: author
+            AttributeType: S
+          - AttributeName: genre
+            AttributeType: S
+          - AttributeName: releaseDate
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: checkoutDate
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+          - AttributeName: returnDueDate
+            AttributeType: S
+          - AttributeName: alertStatus
+            AttributeType: S
+          - AttributeName: generatedAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1-author-releaseDate
+            KeySchema:
+              - AttributeName: author
+                KeyType: HASH
+              - AttributeName: releaseDate
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: GSI2-genre-author
+            KeySchema:
+              - AttributeName: genre
+                KeyType: HASH
+              - AttributeName: author
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: GSI3-userId-checkoutDate
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+              - AttributeName: checkoutDate
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: GSI4-status-returnDueDate
+            KeySchema:
+              - AttributeName: status
+                KeyType: HASH
+              - AttributeName: returnDueDate
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: GSI5-alertStatus-generatedAt
+            KeySchema:
+              - AttributeName: alertStatus
+                KeyType: HASH
+              - AttributeName: generatedAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+functions:
+  searchBooks:
+    handler: src/handlers/searchBooks.handler
+    events:
+      - http:
+          path: /books
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  getBook:
+    handler: src/handlers/getBook.handler
+    events:
+      - http:
+          path: /books/{isbn}
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  addBook:
+    handler: src/handlers/addBook.handler
+    events:
+      - http:
+          path: /books
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  editBook:
+    handler: src/handlers/editBook.handler
+    events:
+      - http:
+          path: /books/{isbn}
+          method: put
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  deleteBook:
+    handler: src/handlers/deleteBook.handler
+    events:
+      - http:
+          path: /books/{isbn}
+          method: delete
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  borrowBook:
+    handler: src/handlers/borrowBook.handler
+    events:
+      - http:
+          path: /loans/checkout
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  returnBook:
+    handler: src/handlers/returnBook.handler
+    events:
+      - http:
+          path: /loans/checkin
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  getUserLoans:
+    handler: src/handlers/getUserLoans.handler
+    events:
+      - http:
+          path: /loans/user/{userId}
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  placeHold:
+    handler: src/handlers/placeHold.handler
+    events:
+      - http:
+          path: /holds
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  cancelHold:
+    handler: src/handlers/cancelHold.handler
+    events:
+      - http:
+          path: /holds/{isbn}
+          method: delete
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  getMyHold:
+    handler: src/handlers/getMyHold.handler
+    events:
+      - http:
+          path: /holds/{isbn}/me
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node20
+    platform: node
+  serverless-offline:
+    httpPort: 3002
+    lambdaPort: 3102
+    host: localhost
+    noPrependStageInUrl: true
+    dotenv: ../../.env

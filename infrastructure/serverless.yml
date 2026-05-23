@@ -1,0 +1,89 @@
+service: library-infra
+frameworkVersion: '3'
+
+# Deploys: S3 bucket (private) + CloudFront distribution.
+# No custom domain — CloudFront default certificate is used.
+# No VPC — DynamoDB is managed; no private networking needed.
+# SES — reusing MaidLink's verified identity (noreply@maidlink.ca).
+#
+# Deploy: cd infrastructure && npx serverless deploy --stage prod
+# After first deploy, grab the CloudFrontUrl output and:
+#   1. Store it in SSM:
+#      aws ssm put-parameter --name /library/prod/cors-origin \
+#        --value "https://<id>.cloudfront.net" --type SecureString \
+#        --region ca-west-1
+#   2. Add it to Google OAuth authorized redirect URIs:
+#        https://<id>.cloudfront.net/auth/callback
+
+provider:
+  name: aws
+  region: ca-west-1
+  stage: ${opt:stage, 'dev'}
+
+resources:
+  Resources:
+
+    # ── S3 — public read (OAI has compatibility issues with ca-west-1) ────────
+    FrontendBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: index.html
+
+    FrontendBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref FrontendBucket
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal: '*'
+              Action: s3:GetObject
+              Resource: !Sub '${FrontendBucket.Arn}/*'
+
+    # ── CloudFront — no custom domain, default CloudFront certificate ────────
+    FrontendDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Enabled: true
+          DefaultRootObject: index.html
+          Origins:
+            - Id: S3Origin
+              DomainName: !GetAtt FrontendBucket.RegionalDomainName
+              S3OriginConfig:
+                OriginAccessIdentity: ''
+          DefaultCacheBehavior:
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            # CachingOptimized managed policy
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+            AllowedMethods: [GET, HEAD, OPTIONS]
+          # SPA routing — return index.html on 403/404 so React Router handles paths
+          CustomErrorResponses:
+            - ErrorCode: 403
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+            - ErrorCode: 404
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+          ViewerCertificate:
+            CloudFrontDefaultCertificate: true
+          PriceClass: PriceClass_100
+
+  Outputs:
+    FrontendBucketName:
+      Value: !Ref FrontendBucket
+      Export:
+        Name: library-infra-${self:provider.stage}-FrontendBucket
+
+    FrontendDistributionId:
+      Value: !Ref FrontendDistribution
+      Export:
+        Name: library-infra-${self:provider.stage}-FrontendDistributionId
+
+    FrontendUrl:
+      Value: !Sub 'https://${FrontendDistribution.DomainName}'
+      Export:
+        Name: library-infra-${self:provider.stage}-FrontendUrl

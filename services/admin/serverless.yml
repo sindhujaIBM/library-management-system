@@ -1,0 +1,154 @@
+service: library-admin
+frameworkVersion: '3'
+useDotenv: true
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ca-west-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 30
+  environment:
+    NODE_ENV: ${self:provider.stage}
+    JWT_SECRET: ${env:JWT_SECRET}
+    DYNAMO_TABLE: ${env:DYNAMO_TABLE, 'library-dev'}
+    CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:5173'}
+    SES_FROM_EMAIL: ${env:SES_FROM_EMAIL, 'noreply@maidlink.ca'}
+    SES_CONFIG_SET: ${env:SES_CONFIG_SET, 'MaidlinkConfigSet-prod'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource:
+            - arn:aws:dynamodb:ca-west-1:*:table/${env:DYNAMO_TABLE, 'library-dev'}
+            - arn:aws:dynamodb:ca-west-1:*:table/${env:DYNAMO_TABLE, 'library-dev'}/index/*
+        # Bedrock — Nova Micro for chatbot, Haiku for insights
+        # Region must be * — inference profiles route dynamically across us regions
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+          Resource:
+            - arn:aws:bedrock:*::foundation-model/*
+            - arn:aws:bedrock:*:*:inference-profile/*
+        # SES — reusing MaidLink's verified identity (noreply@maidlink.ca, us-east-1)
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+          Resource:
+            - arn:aws:ses:us-east-1:946839354953:identity/maidlink.ca
+            - arn:aws:ses:us-east-1:946839354953:configuration-set/MaidlinkConfigSet-prod
+
+functions:
+  getAllActiveLoans:
+    handler: src/handlers/getAllActiveLoans.handler
+    events:
+      - http:
+          path: /loans/active
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  getOverdueLoans:
+    handler: src/handlers/getOverdueLoans.handler
+    events:
+      - http:
+          path: /loans/overdue
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  getBookLoans:
+    handler: src/handlers/getBookLoans.handler
+    events:
+      - http:
+          path: /loans/book/{isbn}
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  getHolds:
+    handler: src/handlers/getHolds.handler
+    events:
+      - http:
+          path: /holds/{isbn}
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  recommendBooks:
+    handler: src/handlers/recommendBooks.handler
+    events:
+      - http:
+          path: /ai/recommend
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  getLoanInsights:
+    handler: src/handlers/getLoanInsights.handler
+    events:
+      - http:
+          path: /ai/insights
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  getAdminAlerts:
+    handler: src/handlers/getAdminAlerts.handler
+    events:
+      - http:
+          path: /ai/alerts
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  resolveAlert:
+    handler: src/handlers/resolveAlert.handler
+    events:
+      - http:
+          path: /ai/alerts/{alertId}/resolve
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node20
+    platform: node
+  serverless-offline:
+    httpPort: 3003
+    lambdaPort: 3103
+    host: localhost
+    noPrependStageInUrl: true
+    dotenv: ../../.env

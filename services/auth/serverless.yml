@@ -1,0 +1,80 @@
+service: library-auth
+frameworkVersion: '3'
+useDotenv: true
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ca-west-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 10
+  environment:
+    NODE_ENV: ${self:provider.stage}
+    JWT_SECRET: ${env:JWT_SECRET}
+    GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
+    GOOGLE_CLIENT_SECRET: ${env:GOOGLE_CLIENT_SECRET}
+    DYNAMO_TABLE: ${env:DYNAMO_TABLE, 'library-dev'}
+    CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:5173'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+          Resource:
+            - arn:aws:dynamodb:ca-west-1:*:table/${env:DYNAMO_TABLE, 'library-dev'}
+
+functions:
+  googleAuth:
+    handler: src/handlers/google.handler
+    events:
+      - http:
+          path: /auth/google
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  getMe:
+    handler: src/handlers/me.handler
+    events:
+      - http:
+          path: /auth/me
+          method: get
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  promoteUser:
+    handler: src/handlers/promoteUser.handler
+    events:
+      - http:
+          path: /users/{userId}/role
+          method: put
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node20
+    platform: node
+  serverless-offline:
+    httpPort: 3001
+    lambdaPort: 3101
+    host: localhost
+    noPrependStageInUrl: true
+    dotenv: ../../.env

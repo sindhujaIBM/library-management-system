@@ -1,0 +1,27 @@
+{
+  "name": "library-management-system",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm run build --workspace=packages/shared && concurrently -n auth,books,admin,web -c cyan,green,yellow,white \"npm run offline --workspace=services/auth\" \"npm run offline --workspace=services/books\" \"npm run offline --workspace=services/admin\" \"npm run dev --workspace=frontend\"",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "seed": "node scripts/seed.mjs",
+    "seed:scenarios": "node scripts/seed-scenarios.mjs",
+    "seed:alerts": "node scripts/seed-alerts.mjs",
+    "make-librarian": "node scripts/make-librarian.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.5"
+  }
+}
