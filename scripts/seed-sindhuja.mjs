@@ -40,10 +40,10 @@ function daysFromNow(n) { return new Date(now.getTime() + n * DAY).toISOString()
 // ─── users ──────────────────────────────────────────────────────────────────
 
 const SINDHUJA = {
-  userId:   'google_sindhuja_01',
-  name:     'Sindhuja K',
+  userId:   'google_109703877221424714743',
+  name:     'Sindhuja K S',
   email:    'onvsindhu@gmail.com',
-  googleId: 'sindhuja_01',
+  googleId: '109703877221424714743',
 };
 
 // Auxiliary member — holds a book Sindhuja is waiting for (triggers "available soon" email)
