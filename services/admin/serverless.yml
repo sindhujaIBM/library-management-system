@@ -19,7 +19,7 @@ provider:
     DYNAMO_TABLE: ${env:DYNAMO_TABLE, 'library-dev'}
     CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:5173'}
     SES_FROM_EMAIL: ${env:SES_FROM_EMAIL, 'noreply@maidlink.ca'}
-    SES_CONFIG_SET: ${env:SES_CONFIG_SET, 'MaidlinkConfigSet-prod'}
+    SES_CONFIG_SET: ${env:SES_CONFIG_SET, ''}
   iam:
     role:
       statements:

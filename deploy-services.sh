@@ -54,7 +54,6 @@ export DYNAMO_TABLE="library-$STAGE"
 
 # Reuse MaidLink's verified SES identity — no new SES setup required
 export SES_FROM_EMAIL="noreply@maidlink.ca"
-export SES_CONFIG_SET="MaidlinkConfigSet-prod"
 
 echo "  CORS_ORIGIN : $CORS_ORIGIN"
 echo "  DYNAMO_TABLE: $DYNAMO_TABLE"

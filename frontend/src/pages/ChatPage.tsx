@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { adminClient } from '../api/client';
 
 interface Message { role: 'user' | 'assistant'; content: string; }
@@ -59,7 +60,20 @@ export function ChatPage() {
                   ? 'bg-brand-600 text-white rounded-br-sm'
                   : 'bg-stone-100 text-stone-800 rounded-bl-sm'
               }`}>
-                {msg.content}
+                {msg.role === 'assistant' ? (
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                      ul: ({ children }) => <ul className="mt-1 mb-1 space-y-0.5 pl-4 list-disc">{children}</ul>,
+                      ol: ({ children }) => <ol className="mt-1 mb-1 space-y-0.5 pl-4 list-decimal">{children}</ol>,
+                      li: ({ children }) => <li className="leading-snug">{children}</li>,
+                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                      em: ({ children }) => <em className="italic">{children}</em>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                ) : msg.content}
               </div>
             </div>
           ))}

@@ -1,6 +1,10 @@
 import { ScanCommand, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { v4 as uuid } from 'uuid';
 import { getDynamo, TABLE } from '@library/shared';
+
+const bedrock = new BedrockRuntimeClient({ region: 'us-west-2' });
+const CLAUDE_HAIKU = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 
 const HOLD_THRESHOLD = 5;
 
@@ -66,10 +70,42 @@ export const handler = async (): Promise<void> => {
     const { title, author, totalCopies: currentCopies } = bookResult.Item as {
       title: string; author: string; totalCopies: number;
     };
-    const recommendedCopiesOrdered = Math.ceil(holdCount / 3);
     const amazonSearchUrl = `https://www.amazon.ca/s?k=${encodeURIComponent(`${title} ${author}`)}`;
-    const alertId = uuid();
 
+    // Ask Claude Haiku for a reasoned order recommendation
+    let recommendedCopiesOrdered = Math.ceil(holdCount / 3);
+    let estimatedCostCAD: number | null = null;
+    let reasoning: string | null = null;
+    try {
+      const haikuResponse = await bedrock.send(new InvokeModelCommand({
+        modelId: CLAUDE_HAIKU,
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: JSON.stringify({
+          anthropic_version: 'bedrock-2023-05-31',
+          system: 'You are a library acquisition advisor. Respond only with valid JSON — no markdown, no explanation outside the JSON.',
+          messages: [{
+            role: 'user',
+            content: `The library has ${holdCount} patrons waiting for "${title}" by ${author} and currently owns ${currentCopies} ${currentCopies === 1 ? 'copy' : 'copies'}. Recommend how many additional copies to order and estimate the total cost (assume $22 CAD per copy on average). Respond with JSON: {"recommendedCopiesOrdered": number, "estimatedCostCAD": number, "reasoning": "1-2 sentences"}`,
+          }],
+          max_tokens: 200,
+          temperature: 0.2,
+        }),
+      }));
+      const haikuResult = JSON.parse(Buffer.from(haikuResponse.body as Uint8Array).toString());
+      const parsed = JSON.parse(haikuResult.content?.[0]?.text ?? '{}') as {
+        recommendedCopiesOrdered?: number;
+        estimatedCostCAD?: number;
+        reasoning?: string;
+      };
+      if (parsed.recommendedCopiesOrdered) recommendedCopiesOrdered = parsed.recommendedCopiesOrdered;
+      if (parsed.estimatedCostCAD) estimatedCostCAD = parsed.estimatedCostCAD;
+      if (parsed.reasoning) reasoning = parsed.reasoning;
+    } catch {
+      // Haiku call failed — fall back to computed defaults, alert still gets created
+    }
+
+    const alertId = uuid();
     await db.send(new PutCommand({
       TableName: TABLE,
       Item: {
@@ -88,6 +124,8 @@ export const handler = async (): Promise<void> => {
           currentCopies,
           holdQueueLength: holdCount,
           recommendedCopiesOrdered,
+          ...(estimatedCostCAD !== null ? { estimatedCostCAD } : {}),
+          ...(reasoning ? { reasoning } : {}),
           amazonSearchUrl,
         },
         generatedAt: new Date().toISOString(),

@@ -1,6 +1,10 @@
 import { ScanCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { v4 as uuid } from 'uuid';
 import { getDynamo, TABLE } from '@library/shared';
+
+const bedrock = new BedrockRuntimeClient({ region: 'us-west-2' });
+const CLAUDE_HAIKU = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 
 const SIX_MONTHS_MS = 180 * 24 * 60 * 60 * 1000;
 const SUGGESTED_PRICE_CAD = 4.0;
@@ -53,8 +57,41 @@ export const handler = async (): Promise<void> => {
     const daysSinceLastLoan = Math.floor(
       (Date.now() - new Date(referenceDate).getTime()) / (24 * 60 * 60 * 1000)
     );
-    const alertId = uuid();
 
+    // Ask Claude Haiku to reason about whether this book warrants deaccessioning
+    let suggestedStartingPriceCAD = SUGGESTED_PRICE_CAD;
+    let suggestedAction = 'Deaccession 1 copy via Friends of the Library book sale';
+    let reasoning: string | null = null;
+    try {
+      const haikuResponse = await bedrock.send(new InvokeModelCommand({
+        modelId: CLAUDE_HAIKU,
+        contentType: 'application/json',
+        accept: 'application/json',
+        body: JSON.stringify({
+          anthropic_version: 'bedrock-2023-05-31',
+          system: 'You are a library collection management advisor. Respond only with valid JSON — no markdown, no explanation outside the JSON.',
+          messages: [{
+            role: 'user',
+            content: `"${book.title}" by ${book.author} has not been borrowed in ${daysSinceLastLoan} days. The library owns ${book.totalCopies} ${Number(book.totalCopies) === 1 ? 'copy' : 'copies'}. Suggest a deaccession action and starting auction price (CAD, range $2–$15). Respond with JSON: {"suggestedAction": "string", "suggestedStartingPriceCAD": number, "reasoning": "1-2 sentences explaining why this book is a good candidate for deaccessioning"}`,
+          }],
+          max_tokens: 200,
+          temperature: 0.2,
+        }),
+      }));
+      const haikuResult = JSON.parse(Buffer.from(haikuResponse.body as Uint8Array).toString());
+      const parsed = JSON.parse(haikuResult.content?.[0]?.text ?? '{}') as {
+        suggestedAction?: string;
+        suggestedStartingPriceCAD?: number;
+        reasoning?: string;
+      };
+      if (parsed.suggestedAction) suggestedAction = parsed.suggestedAction;
+      if (parsed.suggestedStartingPriceCAD) suggestedStartingPriceCAD = parsed.suggestedStartingPriceCAD;
+      if (parsed.reasoning) reasoning = parsed.reasoning;
+    } catch {
+      // Fall back to defaults if Haiku call fails
+    }
+
+    const alertId = uuid();
     await db.send(new PutCommand({
       TableName: TABLE,
       Item: {
@@ -73,8 +110,9 @@ export const handler = async (): Promise<void> => {
           lastBorrowedDate: referenceDate,
           daysSinceLastLoan,
           currentCopies: book.totalCopies,
-          suggestedAction: 'Deaccession 1 copy via Friends of the Library book sale',
-          suggestedStartingPriceCAD: SUGGESTED_PRICE_CAD,
+          suggestedAction,
+          suggestedStartingPriceCAD,
+          ...(reasoning ? { reasoning } : {}),
         },
         generatedAt: new Date().toISOString(),
       },

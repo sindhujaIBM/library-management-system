@@ -16,7 +16,7 @@ async function sendEmail(to: string, subject: string, body: string): Promise<voi
       Subject: { Data: subject },
       Body: { Text: { Data: body } },
     },
-    ConfigurationSetName: CONFIG_SET,
+    ...(CONFIG_SET ? { ConfigurationSetName: CONFIG_SET } : {}),
   }));
 }
 

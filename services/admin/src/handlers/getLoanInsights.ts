@@ -68,6 +68,7 @@ Renewal rate: ${loans.filter(l => l.renewalCount > 0).length} of ${loans.length}
     contentType: 'application/json',
     accept: 'application/json',
     body: JSON.stringify({
+      anthropic_version: 'bedrock-2023-05-31',
       system: 'You are a data analyst for a public library. Analyze the loan data and produce a concise, actionable insight report for the head librarian. Focus on trends, opportunities, and any concerns. Write in plain English, under 300 words. Use bullet points where helpful.',
       messages: [{ role: 'user', content: dataSnapshot }],
       max_tokens: 600,

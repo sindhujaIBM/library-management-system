@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { adminClient } from '../../api/client';
 
 interface InsightsData {
@@ -25,6 +26,9 @@ export function AdminInsightsPage() {
     finally { setLoading(false); }
   }
 
+  const maxGenreCount = result?.data.topGenres[0]?.[1] ?? 1;
+  const maxMonthCount = result ? Math.max(...result.data.monthlyTrend.map(([, c]) => c)) : 1;
+
   return (
     <div>
       <div className="flex items-start justify-between mb-6">
@@ -34,7 +38,9 @@ export function AdminInsightsPage() {
         </div>
         <button onClick={generate} disabled={loading}
           className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2">
-          {loading ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Analyzing…</> : '✨ Generate Insights'}
+          {loading
+            ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Analyzing…</>
+            : result ? '↺ Regenerate' : '✨ Generate Insights'}
         </button>
       </div>
 
@@ -45,62 +51,112 @@ export function AdminInsightsPage() {
         </div>
       )}
 
+      {loading && !result && (
+        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-16 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto mb-4" />
+          <p className="text-stone-400 text-sm">Claude Haiku is analyzing your loan data…</p>
+        </div>
+      )}
+
       {result && (
-        <div className="space-y-6">
-          {/* AI narrative */}
-          <div className="bg-white rounded-xl border border-brand-100 shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg">🤖</span>
-              <h2 className="font-semibold text-stone-800">AI Analysis</h2>
-              <span className="text-xs text-stone-400 ml-auto">Generated {new Date(result.generatedAt).toLocaleString()}</span>
+        <div className="space-y-5">
+
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4 text-center">
+              <p className="text-3xl font-bold text-stone-900">{result.data.totalLoans}</p>
+              <p className="text-xs text-stone-400 mt-0.5">Total Loans</p>
             </div>
-            <p className="text-stone-700 text-sm leading-relaxed whitespace-pre-line">{result.insights}</p>
+            <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4 text-center">
+              <p className="text-3xl font-bold text-stone-900">{result.data.topGenres.length}</p>
+              <p className="text-xs text-stone-400 mt-0.5">Active Genres</p>
+            </div>
+            <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4 text-center">
+              <p className="text-3xl font-bold text-stone-900">{result.data.topAuthors.length}</p>
+              <p className="text-xs text-stone-400 mt-0.5">Top Authors</p>
+            </div>
           </div>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-6">
+          {/* Charts row */}
+          <div className="grid grid-cols-2 gap-4">
+
+            {/* Genre bar chart */}
             <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
-              <h3 className="font-semibold text-stone-700 text-sm mb-3">Top Genres</h3>
-              <div className="space-y-2">
+              <h3 className="font-semibold text-stone-700 text-sm mb-4">Top Genres</h3>
+              <div className="space-y-3">
                 {result.data.topGenres.map(([genre, count]) => (
-                  <div key={genre} className="flex items-center gap-3">
-                    <div className="flex-1 bg-stone-100 rounded-full h-2 overflow-hidden">
-                      <div className="bg-brand-500 h-full rounded-full" style={{ width: `${(count / result.data.topGenres[0][1]) * 100}%` }} />
+                  <div key={genre}>
+                    <div className="flex justify-between text-xs text-stone-500 mb-1">
+                      <span>{genre}</span>
+                      <span className="font-medium text-stone-700">{count}</span>
                     </div>
-                    <span className="text-xs text-stone-600 w-28 text-right">{genre} ({count})</span>
+                    <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-brand-500 rounded-full transition-all duration-500"
+                        style={{ width: `${(count / maxGenreCount) * 100}%` }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
+            {/* Monthly trend bar chart */}
             <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
-              <h3 className="font-semibold text-stone-700 text-sm mb-3">Top Authors</h3>
-              <div className="space-y-2">
-                {result.data.topAuthors.map(([author, count]) => (
-                  <div key={author} className="flex items-center justify-between text-sm">
-                    <span className="text-stone-700 truncate">{author}</span>
-                    <span className="text-stone-400 ml-2 flex-shrink-0">{count} loans</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
-            <h3 className="font-semibold text-stone-700 text-sm mb-3">Monthly Trend (last 6 months)</h3>
-            <div className="flex items-end gap-3 h-24">
-              {result.data.monthlyTrend.map(([month, count]) => {
-                const max = Math.max(...result.data.monthlyTrend.map(([, c]) => c));
-                return (
+              <h3 className="font-semibold text-stone-700 text-sm mb-4">Checkouts per Month</h3>
+              <div className="flex items-end gap-2 h-28">
+                {result.data.monthlyTrend.map(([month, count]) => (
                   <div key={month} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-xs text-stone-500">{count}</span>
-                    <div className="w-full bg-brand-500 rounded-t" style={{ height: `${(count / max) * 80}%` }} />
+                    <span className="text-xs font-medium text-stone-600">{count}</span>
+                    <div
+                      className="w-full bg-brand-500 rounded-t-sm transition-all duration-500"
+                      style={{ height: `${Math.max((count / maxMonthCount) * 80, 4)}%` }}
+                    />
                     <span className="text-xs text-stone-400">{month.slice(5)}</span>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
           </div>
+
+          {/* Top authors */}
+          <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+            <h3 className="font-semibold text-stone-700 text-sm mb-3">Top Authors</h3>
+            <div className="flex flex-wrap gap-2">
+              {result.data.topAuthors.map(([author, count], i) => (
+                <span key={author}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                    i === 0 ? 'bg-brand-100 text-brand-800' :
+                    i === 1 ? 'bg-stone-100 text-stone-700' :
+                    'bg-stone-50 text-stone-500'
+                  }`}>
+                  {author} · {count}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* AI narrative */}
+          <div className="bg-white rounded-xl border border-brand-100 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <span className="text-base">🤖</span>
+              <h2 className="font-semibold text-stone-800 text-sm">AI Analysis</h2>
+              <span className="text-xs text-stone-400 ml-auto">
+                Generated {new Date(result.generatedAt).toLocaleString()}
+              </span>
+            </div>
+            <div className="prose prose-sm prose-stone max-w-none
+              prose-headings:font-semibold prose-headings:text-stone-800
+              prose-h2:text-base prose-h2:mt-5 prose-h2:mb-2
+              prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-1
+              prose-p:text-stone-600 prose-p:leading-relaxed prose-p:my-1
+              prose-strong:text-stone-800 prose-strong:font-semibold
+              prose-ul:my-1 prose-li:text-stone-600 prose-li:my-0.5
+              prose-ol:my-1">
+              <ReactMarkdown>{result.insights}</ReactMarkdown>
+            </div>
+          </div>
+
         </div>
       )}
     </div>
