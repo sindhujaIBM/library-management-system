@@ -18,6 +18,8 @@ provider:
     JWT_SECRET: ${env:JWT_SECRET}
     DYNAMO_TABLE: ${env:DYNAMO_TABLE, 'library-dev'}
     CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:5173'}
+    SES_FROM_EMAIL: ${env:SES_FROM_EMAIL, 'noreply@maidlink.ca'}
+    SES_CONFIG_SET: ${env:SES_CONFIG_SET, 'MaidlinkConfigSet-prod'}
   iam:
     role:
       statements:
@@ -33,6 +35,13 @@ provider:
           Resource:
             - arn:aws:dynamodb:ca-west-1:*:table/${env:DYNAMO_TABLE, 'library-dev'}
             - arn:aws:dynamodb:ca-west-1:*:table/${env:DYNAMO_TABLE, 'library-dev'}/index/*
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+          Resource:
+            - arn:aws:ses:us-east-1:946839354953:identity/maidlink.ca
+            - arn:aws:ses:us-east-1:946839354953:configuration-set/MaidlinkConfigSet-prod
 
 resources:
   Resources:
@@ -176,6 +185,17 @@ functions:
     events:
       - http:
           path: /loans/checkout
+          method: post
+          cors:
+            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            headers: [Content-Type, Authorization]
+            allowCredentials: true
+
+  bulkCheckout:
+    handler: src/handlers/bulkCheckout.handler
+    events:
+      - http:
+          path: /loans/checkout/bulk
           method: post
           cors:
             origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"

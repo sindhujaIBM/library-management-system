@@ -1,9 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCart } from '../../contexts/CartContext';
 import { useState } from 'react';
 
 export function Navbar() {
   const { user, isLibrarian, logout } = useAuth();
+  const { cart } = useCart();
   const navigate = useNavigate();
   const [adminOpen, setAdminOpen] = useState(false);
 
@@ -48,6 +50,16 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-4">
+            {user && (
+              <Link to="/cart" className="relative text-stone-200 hover:text-white transition-colors">
+                <span className="text-xl">🛒</span>
+                {cart.length > 0 && (
+                  <span className="absolute -top-1.5 -right-2 bg-amber-500 text-white text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none">
+                    {cart.length}
+                  </span>
+                )}
+              </Link>
+            )}
             {user ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm text-stone-300 hidden sm:block">{user.name}</span>

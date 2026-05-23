@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { booksClient } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
 
 interface Book {
   ISBN: string; title: string; author: string; genre: string;
@@ -14,11 +15,15 @@ export function BookDetailPage() {
   const { isbn } = useParams<{ isbn: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToCart, removeFromCart, isInCart } = useCart();
+
   const [book, setBook] = useState<Book | null>(null);
   const [myHold, setMyHold] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const inCart = isbn ? isInCart(isbn) : false;
 
   useEffect(() => {
     if (!isbn) return;
@@ -31,7 +36,7 @@ export function BookDetailPage() {
     }).catch(() => navigate('/')).finally(() => setLoading(false));
   }, [isbn, user, navigate]);
 
-  async function handleBorrow() {
+  async function handleBorrowNow() {
     if (!isbn) return;
     setActionLoading(true); setMessage(null);
     try {
@@ -46,6 +51,24 @@ export function BookDetailPage() {
     } finally { setActionLoading(false); }
   }
 
+  function handleCartToggle() {
+    if (!book) return;
+    if (inCart) {
+      removeFromCart(book.ISBN);
+    } else {
+      addToCart({
+        ISBN: book.ISBN,
+        title: book.title,
+        author: book.author,
+        genre: book.genre,
+        availableCopies: book.availableCopies,
+        coverImageUrl: book.coverImageUrl,
+      });
+      setMessage({ type: 'success', text: 'Added to cart! You can checkout all your books at once from the cart.' });
+      setTimeout(() => setMessage(null), 3000);
+    }
+  }
+
   async function handleHold() {
     if (!isbn) return;
     setActionLoading(true); setMessage(null);
@@ -58,7 +81,7 @@ export function BookDetailPage() {
       } else {
         await booksClient.post('/holds', { ISBN: isbn });
         setMyHold(true);
-        setMessage({ type: 'success', text: 'Hold placed! We\'ll notify you when it\'s available.' });
+        setMessage({ type: 'success', text: "Hold placed! We'll notify you when it's available." });
         setBook(b => b ? { ...b, holdCount: b.holdCount + 1 } : b);
       }
     } catch (err: unknown) {
@@ -119,12 +142,22 @@ export function BookDetailPage() {
             )}
 
             {user ? (
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 {available && (
-                  <button onClick={handleBorrow} disabled={actionLoading}
-                    className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                    {actionLoading ? '…' : 'Borrow'}
-                  </button>
+                  <>
+                    <button onClick={handleBorrowNow} disabled={actionLoading}
+                      className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                      {actionLoading ? '…' : 'Borrow Now'}
+                    </button>
+                    <button onClick={handleCartToggle}
+                      className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                        inCart
+                          ? 'bg-brand-50 border-brand-300 text-brand-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
+                          : 'bg-white border-stone-200 text-stone-700 hover:border-brand-400 hover:text-brand-700'
+                      }`}>
+                      {inCart ? '✓ In cart — remove' : '+ Add to cart'}
+                    </button>
+                  </>
                 )}
                 {!available && (
                   <button onClick={handleHold} disabled={actionLoading}

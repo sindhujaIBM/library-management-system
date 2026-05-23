@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useCart } from '../../contexts/CartContext';
 
 interface Book {
   ISBN: string;
@@ -13,6 +14,25 @@ interface Book {
 
 export function BookCard({ book }: { book: Book }) {
   const available = book.availableCopies > 0;
+  const { addToCart, removeFromCart, isInCart } = useCart();
+  const inCart = isInCart(book.ISBN);
+
+  function handleCartToggle(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (inCart) {
+      removeFromCart(book.ISBN);
+    } else {
+      addToCart({
+        ISBN: book.ISBN,
+        title: book.title,
+        author: book.author,
+        genre: book.genre,
+        availableCopies: book.availableCopies,
+        coverImageUrl: book.coverImageUrl,
+      });
+    }
+  }
 
   return (
     <Link to={`/books/${book.ISBN}`} className="group block bg-white rounded-xl shadow-sm hover:shadow-md transition-all border border-stone-100 overflow-hidden">
@@ -30,6 +50,18 @@ export function BookCard({ book }: { book: Book }) {
         }`}>
           {available ? `${book.availableCopies} avail.` : 'On loan'}
         </span>
+        {available && (
+          <button
+            onClick={handleCartToggle}
+            className={`absolute bottom-2 right-2 text-xs font-semibold px-2 py-1 rounded-full transition-colors ${
+              inCart
+                ? 'bg-brand-600 text-white'
+                : 'bg-white/90 text-brand-700 hover:bg-brand-600 hover:text-white'
+            }`}
+          >
+            {inCart ? '✓ In cart' : '+ Cart'}
+          </button>
+        )}
       </div>
       <div className="p-3">
         <h3 className="font-semibold text-sm text-stone-900 line-clamp-2 group-hover:text-brand-700 transition-colors">{book.title}</h3>
