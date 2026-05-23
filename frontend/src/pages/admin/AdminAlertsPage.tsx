@@ -10,10 +10,140 @@ interface Alert {
   resolvedAt?: string;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  demand_order: '📦 High Demand — Order More',
-  stale_auction: '🏷️ Stale Inventory — Consider Auction',
-  series_release: '📚 New Series Release',
+function DemandOrderCard({ p }: { p: Record<string, unknown> }) {
+  const title = String(p.title ?? '');
+  const author = String(p.author ?? '');
+  const isbn = String(p.ISBN ?? '');
+  const holds = Number(p.holdQueueLength ?? 0);
+  const copies = Number(p.currentCopies ?? 0);
+  const recommended = Number(p.recommendedCopiesOrdered ?? 0);
+  const waitRatio = Math.round((holds / Math.max(copies, 1)) * 10) / 10;
+  const cost = p.estimatedCostCAD != null ? Number(p.estimatedCostCAD).toFixed(2) : null;
+  const reasoning = p.reasoning ? String(p.reasoning) : null;
+  const amazonUrl = p.amazonSearchUrl ? String(p.amazonSearchUrl) : null;
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-lg font-semibold text-stone-900">{title}</p>
+        <p className="text-sm text-stone-500">{author} · ISBN {isbn}</p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-amber-50 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-amber-700">{holds}</p>
+          <p className="text-xs text-amber-600 mt-0.5">patrons waiting</p>
+        </div>
+        <div className="bg-stone-100 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-stone-700">{copies}</p>
+          <p className="text-xs text-stone-500 mt-0.5">copies owned</p>
+        </div>
+        <div className="bg-green-50 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-green-700">+{recommended}</p>
+          <p className="text-xs text-green-600 mt-0.5">recommended order</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 text-xs text-stone-500">
+        <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
+        {waitRatio}x wait ratio — {holds} holds for {copies} {copies === 1 ? 'copy' : 'copies'}
+      </div>
+
+      {cost && (
+        <p className="text-sm text-stone-600">
+          Estimated cost: <span className="font-semibold">${cost} CAD</span>
+        </p>
+      )}
+
+      {reasoning && (
+        <p className="text-sm text-stone-500 italic border-l-2 border-stone-200 pl-3">{reasoning}</p>
+      )}
+
+      {amazonUrl && (
+        <a href={amazonUrl} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+          Order on Amazon.ca →
+        </a>
+      )}
+    </div>
+  );
+}
+
+function StaleAuctionCard({ p }: { p: Record<string, unknown> }) {
+  const title = String(p.title ?? '');
+  const author = String(p.author ?? '');
+  const isbn = String(p.ISBN ?? '');
+  const daysIdle = Number(p.daysSinceLastLoan ?? 0);
+  const copies = Number(p.currentCopies ?? 0);
+  const price = Number(p.suggestedStartingPriceCAD ?? 0);
+  const action = String(p.suggestedAction ?? '');
+  const reasoning = p.reasoning ? String(p.reasoning) : null;
+  const lastDate = p.lastBorrowedDate
+    ? new Date(String(p.lastBorrowedDate)).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Never borrowed';
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-lg font-semibold text-stone-900">{title}</p>
+        <p className="text-sm text-stone-500">{author} · ISBN {isbn}</p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-red-50 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-red-700">{daysIdle}</p>
+          <p className="text-xs text-red-500 mt-0.5">days idle</p>
+        </div>
+        <div className="bg-stone-100 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-stone-700">{copies}</p>
+          <p className="text-xs text-stone-500 mt-0.5">copies owned</p>
+        </div>
+        <div className="bg-blue-50 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-blue-700">${price}</p>
+          <p className="text-xs text-blue-500 mt-0.5">suggested price</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 text-xs text-stone-500">
+        <span className="inline-block w-2 h-2 rounded-full bg-red-400" />
+        Last borrowed: {lastDate}
+      </div>
+
+      <div className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-700">
+        {action}
+      </div>
+
+      {reasoning && (
+        <p className="text-sm text-stone-500 italic border-l-2 border-stone-200 pl-3">{reasoning}</p>
+      )}
+    </div>
+  );
+}
+
+function SeriesReleaseCard({ p }: { p: Record<string, unknown> }) {
+  const title = String(p.title ?? '');
+  const author = String(p.author ?? '');
+  const series = String(p.series ?? '');
+  const notif = p.notificationsSent ? Number(p.notificationsSent) : null;
+  return (
+    <div className="space-y-2">
+      <p className="text-lg font-semibold text-stone-900">{title}</p>
+      <p className="text-sm text-stone-500">{author} · Series: {series}</p>
+      {notif && <p className="text-sm text-stone-600">{notif} patrons notified</p>}
+    </div>
+  );
+}
+
+function AlertPayload({ type, payload }: { type: Alert['type']; payload: Record<string, unknown> }) {
+  if (type === 'demand_order') return <DemandOrderCard p={payload} />;
+  if (type === 'stale_auction') return <StaleAuctionCard p={payload} />;
+  return <SeriesReleaseCard p={payload} />;
+}
+
+const TYPE_BADGE: Record<string, { label: string; className: string }> = {
+  demand_order:   { label: '📦 Order More Copies',       className: 'bg-amber-100 text-amber-800' },
+  stale_auction:  { label: '🏷️ Consider Deaccessioning', className: 'bg-red-100 text-red-700' },
+  series_release: { label: '📚 New Series Release',       className: 'bg-blue-100 text-blue-700' },
 };
 
 export function AdminAlertsPage() {
@@ -41,8 +171,8 @@ export function AdminAlertsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-serif font-bold text-stone-900">AI Alerts</h1>
-        <p className="text-stone-500 text-sm mt-1">AI-generated recommendations — you approve or reject. Nothing happens automatically.</p>
+        <h1 className="text-2xl font-serif font-bold text-stone-900">Alerts</h1>
+        <p className="text-stone-500 text-sm mt-1">Recommendations surfaced by the system — you approve or reject. Nothing happens automatically.</p>
       </div>
 
       <div className="flex gap-2 mb-6">
@@ -63,33 +193,44 @@ export function AdminAlertsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {alerts.map(alert => (
-            <div key={alert.alertId} className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-semibold text-stone-800">{TYPE_LABELS[alert.type] ?? alert.type}</span>
-                    <span className="text-xs text-stone-400">{new Date(alert.generatedAt).toLocaleDateString()}</span>
+          {alerts.map(alert => {
+            const badge = TYPE_BADGE[alert.type];
+            return (
+              <div key={alert.alertId} className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+                <div className="flex items-start justify-between gap-6">
+                  <div className="flex-1 min-w-0 space-y-4">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${badge.className}`}>
+                        {badge.label}
+                      </span>
+                      <span className="text-xs text-stone-400">
+                        {new Date(alert.generatedAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                      {alert.status !== 'pending' && alert.resolvedAt && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${alert.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-stone-100 text-stone-500'}`}>
+                          {alert.status === 'approved' ? 'Approved' : 'Rejected'} {new Date(alert.resolvedAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
+                    <AlertPayload type={alert.type} payload={alert.payload} />
                   </div>
-                  <div className="bg-stone-50 rounded-lg p-3 text-sm text-stone-700 font-mono whitespace-pre-wrap">
-                    {JSON.stringify(alert.payload, null, 2)}
-                  </div>
+
+                  {alert.status === 'pending' && (
+                    <div className="flex flex-col gap-2 flex-shrink-0">
+                      <button onClick={() => resolve(alert.alertId, 'approved')} disabled={resolving === alert.alertId}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap">
+                        ✓ Approve
+                      </button>
+                      <button onClick={() => resolve(alert.alertId, 'rejected')} disabled={resolving === alert.alertId}
+                        className="bg-white hover:bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap">
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {alert.status === 'pending' && (
-                  <div className="flex flex-col gap-2 flex-shrink-0">
-                    <button onClick={() => resolve(alert.alertId, 'approved')} disabled={resolving === alert.alertId}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                      Approve
-                    </button>
-                    <button onClick={() => resolve(alert.alertId, 'rejected')} disabled={resolving === alert.alertId}
-                      className="bg-red-100 hover:bg-red-200 text-red-700 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                      Reject
-                    </button>
-                  </div>
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

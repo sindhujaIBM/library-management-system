@@ -139,6 +139,30 @@ functions:
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
+  demandDetectionAgent:
+    handler: src/handlers/demandDetectionAgent.handler
+    timeout: 60
+    events:
+      - schedule: cron(0 6 * * ? *)
+
+  staleInventoryAgent:
+    handler: src/handlers/staleInventoryAgent.handler
+    timeout: 60
+    events:
+      - schedule: cron(0 7 ? * SUN *)
+
+  loanLifecycleAgent:
+    handler: src/handlers/loanLifecycleAgent.handler
+    timeout: 120
+    events:
+      - schedule: cron(0 8 * * ? *)
+
+  seriesReleaseAgent:
+    handler: src/handlers/seriesReleaseAgent.handler
+    timeout: 120
+    events:
+      - schedule: cron(0 9 ? * SUN *)
+
 custom:
   esbuild:
     bundle: true
