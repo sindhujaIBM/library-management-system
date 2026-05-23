@@ -4,7 +4,6 @@ import { getDynamo, TABLE } from '@library/shared';
 
 const ses = new SESClient({ region: 'us-east-1' });
 const FROM = process.env.SES_FROM_EMAIL ?? 'noreply@maidlink.ca';
-const CONFIG_SET = process.env.SES_CONFIG_SET;
 
 async function sendEmail(to: string, subject: string, body: string): Promise<void> {
   await ses.send(new SendEmailCommand({
@@ -14,7 +13,6 @@ async function sendEmail(to: string, subject: string, body: string): Promise<voi
       Subject: { Data: subject },
       Body: { Text: { Data: body } },
     },
-    ConfigurationSetName: CONFIG_SET,
   }));
 }
 
