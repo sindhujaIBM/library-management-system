@@ -8,7 +8,7 @@ export const handler = withAuth(async (event: APIGatewayProxyEvent, _auth) => {
   if (!event.body) throw new ValidationError('Request body is required');
 
   const body = JSON.parse(event.body) as Record<string, unknown>;
-  const allowed = ['title', 'author', 'genre', 'series', 'seriesPosition', 'releaseDate', 'totalCopies', 'coverImageUrl'];
+  const allowed = ['title', 'author', 'genre', 'series', 'seriesPosition', 'releaseDate', 'totalCopies', 'coverImageUrl', 'formats'];
 
   const db = getDynamo();
 

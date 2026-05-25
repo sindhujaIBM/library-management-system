@@ -5,8 +5,11 @@ import { withAuth, created, getDynamo, TABLE, ValidationError, NotFoundError, Co
 
 export const handler = withAuth(async (event: APIGatewayProxyEvent, auth) => {
   if (!event.body) throw new ValidationError('Request body is required');
-  const body = JSON.parse(event.body) as { ISBN?: string };
+  const body = JSON.parse(event.body) as { ISBN?: string; format?: string };
   if (!body.ISBN) throw new ValidationError('ISBN is required');
+
+  const format = (body.format ?? 'physical') as 'physical' | 'audiobook' | 'ebook';
+  const isDigital = format === 'audiobook' || format === 'ebook';
 
   const db = getDynamo();
 
@@ -16,8 +19,14 @@ export const handler = withAuth(async (event: APIGatewayProxyEvent, auth) => {
   }));
 
   if (!bookResult.Item) throw new NotFoundError('Book not found');
-  if ((bookResult.Item.availableCopies as number) < 1) {
-    throw new ConflictError('No copies available — consider placing a hold');
+
+  const bookFormats: string[] = bookResult.Item.formats ?? ['physical'];
+  if (!bookFormats.includes(format)) {
+    throw new ConflictError(`This book is not available in ${format} format`);
+  }
+
+  if (!isDigital && (bookResult.Item.availableCopies as number) < 1) {
+    throw new ConflictError('No physical copies available — consider placing a hold');
   }
 
   const now = new Date();
@@ -26,47 +35,74 @@ export const handler = withAuth(async (event: APIGatewayProxyEvent, auth) => {
   const loanId = uuidv4();
   const loanSK = `LOAN#${auth.userId}#${checkoutDate}`;
 
-  try {
-    await db.send(new TransactWriteCommand({
-      TransactItems: [
-        {
-          // Atomic decrement with guard — prevents race condition on last copy
-          Update: {
-            TableName: TABLE,
-            Key: { PK: `BOOK#${body.ISBN}`, SK: 'METADATA' },
-            UpdateExpression: 'SET availableCopies = availableCopies - :one, copiesOnLoan = copiesOnLoan + :one, lastBorrowedDate = :now, updatedAt = :now',
-            ConditionExpression: 'availableCopies > :zero',
-            ExpressionAttributeValues: { ':one': 1, ':zero': 0, ':now': checkoutDate },
-          },
-        },
-        {
-          Put: {
-            TableName: TABLE,
-            Item: {
-              PK: `LOAN#${body.ISBN}`,
-              SK: loanSK,
-              entityType: 'LOAN',
-              loanId,
-              ISBN: body.ISBN,
-              userId: auth.userId,
-              userEmail: auth.email,
-              userName: auth.name,
-              bookTitle: bookResult.Item.title,
-              bookAuthor: bookResult.Item.author,
-              checkoutDate,
-              returnDueDate,
-              status: 'active',
-              renewalCount: 0,
+  if (isDigital) {
+    const { PutCommand } = await import('@aws-sdk/lib-dynamodb');
+    await db.send(new PutCommand({
+      TableName: TABLE,
+      Item: {
+        PK: `LOAN#${body.ISBN}`,
+        SK: loanSK,
+        entityType: 'LOAN',
+        loanId,
+        ISBN: body.ISBN,
+        userId: auth.userId,
+        userEmail: auth.email,
+        userName: auth.name,
+        bookTitle: bookResult.Item.title,
+        bookAuthor: bookResult.Item.author,
+        bookGenre: bookResult.Item.genre,
+        checkoutDate,
+        returnDueDate,
+        status: 'active',
+        renewalCount: 0,
+        format,
+      },
+    }));
+  } else {
+    try {
+      await db.send(new TransactWriteCommand({
+        TransactItems: [
+          {
+            // Atomic decrement with guard — prevents race condition on last copy
+            Update: {
+              TableName: TABLE,
+              Key: { PK: `BOOK#${body.ISBN}`, SK: 'METADATA' },
+              UpdateExpression: 'SET availableCopies = availableCopies - :one, copiesOnLoan = copiesOnLoan + :one, lastBorrowedDate = :now, updatedAt = :now',
+              ConditionExpression: 'availableCopies > :zero',
+              ExpressionAttributeValues: { ':one': 1, ':zero': 0, ':now': checkoutDate },
             },
           },
-        },
-      ],
-    }));
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'TransactionCanceledException') {
-      throw new ConflictError('No copies available — someone just borrowed the last one');
+          {
+            Put: {
+              TableName: TABLE,
+              Item: {
+                PK: `LOAN#${body.ISBN}`,
+                SK: loanSK,
+                entityType: 'LOAN',
+                loanId,
+                ISBN: body.ISBN,
+                userId: auth.userId,
+                userEmail: auth.email,
+                userName: auth.name,
+                bookTitle: bookResult.Item.title,
+                bookAuthor: bookResult.Item.author,
+                bookGenre: bookResult.Item.genre,
+                checkoutDate,
+                returnDueDate,
+                status: 'active',
+                renewalCount: 0,
+                format: 'physical',
+              },
+            },
+          },
+        ],
+      }));
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'TransactionCanceledException') {
+        throw new ConflictError('No copies available — someone just borrowed the last one');
+      }
+      throw err;
     }
-    throw err;
   }
 
   return created({
@@ -75,5 +111,6 @@ export const handler = withAuth(async (event: APIGatewayProxyEvent, auth) => {
     bookTitle: bookResult.Item.title,
     checkoutDate,
     returnDueDate,
+    format,
   });
 });

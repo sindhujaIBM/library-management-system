@@ -56,18 +56,22 @@ const AUX_HOLDER = {
 
 // ─── book assignments ────────────────────────────────────────────────────────
 
-// Auto-renewal books — Sindhuja's loans due TODAY, renewalCount=0, no holds.
-// Both books have enough copies in the base catalog to absorb one more active loan.
+// Auto-renewal loans — Sindhuja's loans due TODAY, renewalCount=0, no holds.
+// One physical, one ebook — shows mixed format in the active loans view.
 const AUTO_RENEW_LOANS = [
   {
     isbn:   '978-0-06-093546-9',
     title:  'Murder on the Orient Express',
     author: 'Agatha Christie',
+    genre:  'Mystery',
+    format: 'physical',
   },
   {
     isbn:   '978-0-8129-9429-2',
     title:  'A Brief History of Time',
     author: 'Stephen Hawking',
+    genre:  'Science',
+    format: 'ebook',   // reading on tablet — no copy decrement for digital
   },
 ];
 
@@ -77,22 +81,25 @@ const HOLD_TRIGGER_BOOK = {
   isbn:   '978-0-525-55360-5',
   title:  'The Midnight Library',
   author: 'Matt Haig',
+  genre:  'Fiction',
 };
 
-// Historical reads — returned loans across the last 6 months
+// Historical reads — returned loans across the last 6 months.
+// Format progression: started physical → discovered audiobook (commuting) → now mixes ebook too.
+// Most recent entries first (offset 15d) → oldest last (offset 177d).
 const HISTORY_BOOKS = [
-  { isbn: '978-0-14-028329-7', title: '1984',                                  author: 'George Orwell' },
-  { isbn: '978-0-7432-7358-9', title: 'Dune',                                  author: 'Frank Herbert' },
-  { isbn: '978-0-439-02348-1', title: "Harry Potter and the Sorcerer's Stone", author: 'J.K. Rowling' },
-  { isbn: '978-0-7432-7359-6', title: 'Gone Girl',                             author: 'Gillian Flynn' },
-  { isbn: '978-0-7432-7360-2', title: 'Sapiens',                               author: 'Yuval Noah Harari' },
-  { isbn: '978-0-14-028428-7', title: "The Hitchhiker's Guide to the Galaxy",  author: 'Douglas Adams' },
-  { isbn: '978-0-593-31012-3', title: 'Atomic Habits',                         author: 'James Clear' },
-  { isbn: '978-0-618-57494-1', title: 'The Fellowship of the Ring',            author: 'J.R.R. Tolkien' },
-  { isbn: '978-0-385-54734-9', title: 'Educated',                              author: 'Tara Westover' },
-  { isbn: '978-0-7432-7357-2', title: 'The Hobbit',                            author: 'J.R.R. Tolkien' },
-  { isbn: '978-1-250-30177-4', title: 'And Then There Were None',              author: 'Agatha Christie' },
-  { isbn: '978-0-439-06486-6', title: "Harry Potter and the Chamber of Secrets", author: 'J.K. Rowling' },
+  { isbn: '978-0-14-028329-7', title: '1984',                                    author: 'George Orwell',       genre: 'Science Fiction', format: 'audiobook' }, // offset 15 — audiobook commute
+  { isbn: '978-0-7432-7358-9', title: 'Dune',                                    author: 'Frank Herbert',       genre: 'Science Fiction', format: 'audiobook' }, // offset 29 — loved it on audio
+  { isbn: '978-0-439-02348-1', title: "Harry Potter and the Sorcerer's Stone",   author: 'J.K. Rowling',        genre: 'Fantasy',         format: 'audiobook' }, // offset 43 — nostalgia audiobook
+  { isbn: '978-0-7432-7359-6', title: 'Gone Girl',                               author: 'Gillian Flynn',       genre: 'Mystery',         format: 'ebook'     }, // offset 57 — ebook on tablet
+  { isbn: '978-0-7432-7360-2', title: 'Sapiens',                                 author: 'Yuval Noah Harari',   genre: 'History',         format: 'ebook'     }, // offset 71 — non-fiction ebook
+  { isbn: '978-0-14-028428-7', title: "The Hitchhiker's Guide to the Galaxy",    author: 'Douglas Adams',       genre: 'Science Fiction', format: 'audiobook' }, // offset 85 — audiobook road trip
+  { isbn: '978-0-593-31012-3', title: 'Atomic Habits',                           author: 'James Clear',         genre: 'Self-Help',       format: 'ebook'     }, // offset 99 — annotated ebook
+  { isbn: '978-0-618-57494-1', title: 'The Fellowship of the Ring',              author: 'J.R.R. Tolkien',      genre: 'Fantasy',         format: 'physical'  }, // offset 113 — physical (gift copy)
+  { isbn: '978-0-385-54734-9', title: 'Educated',                                author: 'Tara Westover',       genre: 'Biography',       format: 'audiobook' }, // offset 127 — memoir on audio
+  { isbn: '978-0-7432-7357-2', title: 'The Hobbit',                              author: 'J.R.R. Tolkien',      genre: 'Fantasy',         format: 'physical'  }, // offset 141 — physical, early days
+  { isbn: '978-1-250-30177-4', title: 'And Then There Were None',                author: 'Agatha Christie',     genre: 'Mystery',         format: 'physical'  }, // offset 155 — physical
+  { isbn: '978-0-439-06486-6', title: "Harry Potter and the Chamber of Secrets", author: 'J.K. Rowling',        genre: 'Fantasy',         format: 'physical'  }, // offset 169 — physical, very start
 ];
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -124,7 +131,7 @@ async function upsertUser(u) {
   console.log(`  added user ${u.name} <${u.email}>`);
 }
 
-async function putLoan({ isbn, userId, userName, userEmail, bookTitle, bookAuthor, checkoutDate, returnDueDate, status, returnedDate, renewalCount = 0 }) {
+async function putLoan({ isbn, userId, userName, userEmail, bookTitle, bookAuthor, bookGenre, checkoutDate, returnDueDate, status, returnedDate, renewalCount = 0, format = 'physical' }) {
   const sk = `LOAN#${userId}#${checkoutDate}`;
   await db.send(new PutCommand({
     TableName: TABLE,
@@ -132,10 +139,10 @@ async function putLoan({ isbn, userId, userName, userEmail, bookTitle, bookAutho
       PK: `LOAN#${isbn}`, SK: sk,
       entityType: 'LOAN',
       loanId: uuid(),
-      ISBN: isbn, userId, userEmail, userName, bookTitle, bookAuthor,
+      ISBN: isbn, userId, userEmail, userName, bookTitle, bookAuthor, bookGenre,
       checkoutDate, returnDueDate,
       ...(returnedDate ? { returnedDate } : {}),
-      status, renewalCount,
+      status, renewalCount, format,
     },
   }));
   written++;
@@ -202,12 +209,13 @@ for (let i = 0; i < HISTORY_BOOKS.length; i++) {
 
   await putLoan({
     isbn: book.isbn, userId: SINDHUJA.userId, userName: SINDHUJA.name, userEmail: SINDHUJA.email,
-    bookTitle: book.title, bookAuthor: book.author,
+    bookTitle: book.title, bookAuthor: book.author, bookGenre: book.genre,
     checkoutDate: checkout, returnDueDate: dueDate, returnedDate: dueDate,
     status: 'returned',
     renewalCount: i % 3 === 0 ? 1 : 0,  // every third loan was renewed — realistic pattern
+    format: book.format,
   });
-  console.log(`  returned  "${book.title}" (checked out ${offset + 21}d ago)`);
+  console.log(`  returned  [${book.format.padEnd(9)}] "${book.title}" (checked out ${offset + 21}d ago)`);
 }
 
 // 3. Active loans due TODAY — will be auto-renewed by loanLifecycleAgent
@@ -221,12 +229,14 @@ for (const book of AUTO_RENEW_LOANS) {
 
   await putLoan({
     isbn: book.isbn, userId: SINDHUJA.userId, userName: SINDHUJA.name, userEmail: SINDHUJA.email,
-    bookTitle: book.title, bookAuthor: book.author,
+    bookTitle: book.title, bookAuthor: book.author, bookGenre: book.genre,
     checkoutDate, returnDueDate,
-    status: 'active', renewalCount: 0,
+    status: 'active', renewalCount: 0, format: book.format,
   });
-  await decrementAvailability(book.isbn, checkoutDate);
-  console.log(`  active  "${book.title}" — due TODAY, renewalCount=0, no holds → WILL AUTO-RENEW`);
+  if (book.format === 'physical') {
+    await decrementAvailability(book.isbn, checkoutDate);
+  }
+  console.log(`  active  [${book.format.padEnd(9)}] "${book.title}" — due TODAY, renewalCount=0, no holds → WILL AUTO-RENEW`);
 }
 
 // 4. Hold-trigger scenario
@@ -242,7 +252,7 @@ const holdBookDue = today; // due TODAY
 
 await putLoan({
   isbn: HOLD_TRIGGER_BOOK.isbn, userId: AUX_HOLDER.userId, userName: AUX_HOLDER.name, userEmail: AUX_HOLDER.email,
-  bookTitle: HOLD_TRIGGER_BOOK.title, bookAuthor: HOLD_TRIGGER_BOOK.author,
+  bookTitle: HOLD_TRIGGER_BOOK.title, bookAuthor: HOLD_TRIGGER_BOOK.author, bookGenre: HOLD_TRIGGER_BOOK.genre,
   checkoutDate: holdBookCheckout, returnDueDate: holdBookDue,
   status: 'active', renewalCount: 0,
 });
@@ -258,6 +268,36 @@ await putHold({
 });
 console.log(`  ${SINDHUJA.name} → hold #1 on "${HOLD_TRIGGER_BOOK.title}" (joined 3 days ago)`);
 
+// 5. Additional digital-only history — audiobook and ebook loans not in the 12-book rotation.
+//    These show Sindhuja's digital usage across children's books (for her niece/nephew)
+//    and recent popular titles only available digitally in this catalog.
+console.log('\n── Additional digital history (Sindhuja) ─────');
+const DIGITAL_EXTRA = [
+  // Children's books — Sindhuja borrowed digitally for her niece/nephew
+  { isbn: '978-0-14-034488-5', title: 'Matilda',                    author: 'Roald Dahl',         genre: 'Children',        format: 'audiobook', daysAgoEnd: 12  },
+  { isbn: '978-0-06-440055-8', title: "Charlotte's Web",            author: 'E.B. White',          genre: 'Children',        format: 'audiobook', daysAgoEnd: 35  },
+  { isbn: '978-0-14-130800-5', title: 'The BFG',                    author: 'Roald Dahl',          genre: 'Children',        format: 'ebook',     daysAgoEnd: 55  },
+  { isbn: '978-0-8109-9313-8', title: 'Diary of a Wimpy Kid',       author: 'Jeff Kinney',         genre: 'Children',        format: 'ebook',     daysAgoEnd: 78  },
+  // Recent digital reads — ebooks for convenience
+  { isbn: '978-0-7432-7356-5', title: 'The Great Gatsby',           author: 'F. Scott Fitzgerald', genre: 'Fiction',         format: 'ebook',     daysAgoEnd: 18  },
+  { isbn: '978-0-441-17271-9', title: 'Dune Messiah',               author: 'Frank Herbert',       genre: 'Science Fiction', format: 'ebook',     daysAgoEnd: 120 },
+  { isbn: '978-0-618-57495-8', title: 'The Two Towers',             author: 'J.R.R. Tolkien',      genre: 'Fantasy',         format: 'audiobook', daysAgoEnd: 145 },
+  // Harry Potter audiobook re-read
+  { isbn: '978-0-439-06486-6', title: "Harry Potter and the Chamber of Secrets", author: 'J.K. Rowling', genre: 'Fantasy', format: 'audiobook', daysAgoEnd: 25 },
+];
+
+for (const entry of DIGITAL_EXTRA) {
+  const checkout   = daysAgo(entry.daysAgoEnd + 21);
+  const dueDate    = daysAgo(entry.daysAgoEnd);
+  await putLoan({
+    isbn: entry.isbn, userId: SINDHUJA.userId, userName: SINDHUJA.name, userEmail: SINDHUJA.email,
+    bookTitle: entry.title, bookAuthor: entry.author, bookGenre: entry.genre,
+    checkoutDate: checkout, returnDueDate: dueDate, returnedDate: dueDate,
+    status: 'returned', renewalCount: 0, format: entry.format,
+  });
+  console.log(`  returned  [${entry.format.padEnd(9)}] "${entry.title}"`);
+}
+
 // ─── summary ────────────────────────────────────────────────────────────────
 
 console.log(`
@@ -266,16 +306,22 @@ console.log(`
 
 Sindhuja K <onvsindhu@gmail.com>
   userId : ${SINDHUJA.userId}
-  History: 12 returned loans spanning ~6 months
-           (mix of renewals and straight returns)
+  History: 20 returned loans spanning ~6 months
+    Format progression: physical (oldest) → audiobook (commuting) → ebook + audiobook (recent)
+    Audiobook reads: 1984, Dune, HP Sorcerer's Stone, Hitchhiker's Guide, Educated,
+                     Matilda, Charlotte's Web, HP Chamber of Secrets, The Two Towers
+    Ebook reads:     Gone Girl, Sapiens, Atomic Habits, Great Gatsby, Dune Messiah,
+                     The BFG, Diary of a Wimpy Kid
+    Physical reads:  Fellowship of the Ring, The Hobbit, And Then There Were None, HP Chamber
+
+Active loans (due TODAY):
+  📚 Physical  — "Murder on the Orient Express" (will auto-renew)
+  📱 eBook     — "A Brief History of Time"     (will auto-renew — digital, no copy change)
 
 Emails that will fire next time loanLifecycleAgent runs:
   ✉ Auto-renewal #1 — "Murder on the Orient Express"
-      Subject: "Murder on the Orient Express" has been automatically renewed
   ✉ Auto-renewal #2 — "A Brief History of Time"
-      Subject: "A Brief History of Time" has been automatically renewed
-  ✉ Hold available — "The Midnight Library"
-      Subject: Good news: "The Midnight Library" will be available soon
+  ✉ Hold available  — "The Midnight Library"
               (Priya Mehta is the current borrower, due today, hold queue exists)
 
 To trigger the emails immediately, invoke the loanLifecycleAgent Lambda:

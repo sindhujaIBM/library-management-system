@@ -2,6 +2,7 @@ export type Role = 'member' | 'librarian';
 export type LoanStatus = 'active' | 'returned';
 export type AlertType = 'demand_order' | 'stale_auction' | 'series_release';
 export type AlertStatus = 'pending' | 'approved' | 'rejected';
+export type BookFormat = 'physical' | 'audiobook' | 'ebook';
 
 export interface Book {
   ISBN: string;
@@ -16,6 +17,7 @@ export interface Book {
   copiesOnLoan: number;
   lastBorrowedDate?: string;
   coverImageUrl?: string;
+  formats?: BookFormat[];
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +36,7 @@ export interface Loan {
   status: LoanStatus;
   renewalCount: number;
   autoRenewedAt?: string;
+  format: BookFormat;
   isOverdue?: boolean;
 }
 

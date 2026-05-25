@@ -1,3 +1,39 @@
+## Claude Instructions
+
+### How to collaborate
+- **Check blind spots proactively.** Before implementing, ask: what's the failure mode if this is wrong? What assumption is being made here? Surface tradeoffs the user hasn't asked about — architectural decisions, edge cases, missing pieces in the design.
+- **Ask before implementing** when the task is underspecified. List what you think is implied and confirm before touching code.
+- **Challenge assumptions** — if you see a decision that has an unstated cost (e.g. a full table scan, a missing pagination loop, a race condition), name it explicitly even if the user didn't ask.
+- **Don't just execute** — be a thought partner. The user wants to be prepared for interview-level questions on every decision.
+
+### Deploy commands
+
+**Backend services** — run from each service directory, targeting `--stage dev` or `--stage prod`:
+```bash
+cd services/auth  && npx serverless deploy --stage prod
+cd services/books && npx serverless deploy --stage prod
+cd services/admin && npx serverless deploy --stage prod
+```
+Deploy all three in parallel when deploying backend.
+
+**Frontend** — build, sync to S3, invalidate CloudFront:
+```bash
+cd frontend && npm run build
+aws s3 sync frontend/dist s3://library-infra-prod-frontendbucket-zuos8tibcr03 --delete --region ca-west-1
+aws cloudfront create-invalidation --distribution-id E5IPUVITQ25WX --paths "/*" --region us-east-1
+```
+Frontend live at: https://d360m6tattqe2h.cloudfront.net
+
+**Seed commands** — default to `library-dev`, use `DYNAMO_TABLE=library-prod` for prod:
+```bash
+node scripts/seed.mjs                              # books
+node scripts/seed-scenarios.mjs                    # scenario data
+node scripts/seed-sindhuja.mjs                     # Sindhuja's loan history
+DYNAMO_TABLE=library-prod node scripts/seed.mjs    # prod
+```
+
+---
+
 ## Project Overview
 
 A Mini Library Management System with AI-powered operational intelligence. Built for the Anju Software take-home assignment.

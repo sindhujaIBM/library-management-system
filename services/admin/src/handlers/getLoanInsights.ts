@@ -10,37 +10,37 @@ const CLAUDE_HAIKU = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 export const handler = withAuth(async (_event: APIGatewayProxyEvent, _auth) => {
   const db = getDynamo();
 
-  // Fetch all loans for analysis
-  const loansResult = await db.send(new ScanCommand({
-    TableName: TABLE,
-    FilterExpression: 'entityType = :et',
-    ExpressionAttributeValues: { ':et': 'LOAN' },
-    ProjectionExpression: 'ISBN, bookTitle, bookAuthor, checkoutDate, returnedDate, #status, renewalCount',
-    ExpressionAttributeNames: { '#status': 'status' },
-  }));
-
-  const loans = loansResult.Items ?? [];
+  // Fetch all loans for analysis — paginate to handle tables larger than 1MB
+  const loans: Record<string, unknown>[] = [];
+  let lastKey: Record<string, unknown> | undefined;
+  do {
+    const page = await db.send(new ScanCommand({
+      TableName: TABLE,
+      FilterExpression: 'entityType = :et',
+      ExpressionAttributeValues: { ':et': 'LOAN' },
+      ProjectionExpression: 'ISBN, bookTitle, bookAuthor, bookGenre, checkoutDate, returnedDate, #status, renewalCount, format',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExclusiveStartKey: lastKey,
+    }));
+    loans.push(...(page.Items ?? []));
+    lastKey = page.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (lastKey);
 
   // Aggregate by genre/author/month for the prompt
   const byGenre: Record<string, number> = {};
   const byAuthor: Record<string, number> = {};
   const byMonth: Record<string, number> = {};
-
-  // Fetch books to get genre info
-  const booksResult = await db.send(new ScanCommand({
-    TableName: TABLE,
-    FilterExpression: 'entityType = :et',
-    ExpressionAttributeValues: { ':et': 'BOOK' },
-    ProjectionExpression: 'ISBN, genre',
-  }));
-  const isbnToGenre = Object.fromEntries((booksResult.Items ?? []).map(b => [b.ISBN, b.genre]));
+  const byFormat: Record<string, number> = { physical: 0, audiobook: 0, ebook: 0 };
 
   for (const loan of loans) {
-    const genre = isbnToGenre[loan.ISBN] ?? 'Unknown';
+    const genre = (loan.bookGenre as string | undefined) ?? 'Unknown';
+    const author = (loan.bookAuthor as string | undefined) ?? 'Unknown';
+    const month = (loan.checkoutDate as string | undefined)?.slice(0, 7) ?? 'unknown';
+    const fmt = (loan.format as string | undefined) ?? 'physical';
     byGenre[genre] = (byGenre[genre] ?? 0) + 1;
-    byAuthor[loan.bookAuthor] = (byAuthor[loan.bookAuthor] ?? 0) + 1;
-    const month = loan.checkoutDate?.slice(0, 7) ?? 'unknown';
+    byAuthor[author] = (byAuthor[author] ?? 0) + 1;
     byMonth[month] = (byMonth[month] ?? 0) + 1;
+    byFormat[fmt] = (byFormat[fmt] ?? 0) + 1;
   }
 
   const topGenres = Object.entries(byGenre).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -51,6 +51,11 @@ export const handler = withAuth(async (_event: APIGatewayProxyEvent, _auth) => {
 Total loans in system: ${loans.length}
 Active loans: ${loans.filter(l => l.status === 'active').length}
 
+Format breakdown:
+  Physical: ${byFormat.physical} loans
+  Audiobook: ${byFormat.audiobook} loans
+  Ebook/Kindle: ${byFormat.ebook} loans
+
 Top genres by loan count:
 ${topGenres.map(([g, c]) => `  ${g}: ${c} loans`).join('\n')}
 
@@ -60,7 +65,7 @@ ${topAuthors.map(([a, c]) => `  ${a}: ${c} loans`).join('\n')}
 Monthly loan trend (last 6 months):
 ${monthlyTrend.map(([m, c]) => `  ${m}: ${c} loans`).join('\n')}
 
-Renewal rate: ${loans.filter(l => l.renewalCount > 0).length} of ${loans.length} loans were renewed
+Renewal rate: ${loans.filter(l => (l.renewalCount as number) > 0).length} of ${loans.length} loans were renewed
 `;
 
   const response = await bedrock.send(new InvokeModelCommand({
@@ -81,7 +86,7 @@ Renewal rate: ${loans.filter(l => l.renewalCount > 0).length} of ${loans.length}
 
   return ok({
     insights,
-    data: { totalLoans: loans.length, topGenres, topAuthors, monthlyTrend },
+    data: { totalLoans: loans.length, topGenres, topAuthors, monthlyTrend, byFormat },
     generatedAt: new Date().toISOString(),
   });
 }, 'librarian');

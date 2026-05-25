@@ -5,10 +5,19 @@ import { useAuth } from '../contexts/AuthContext';
 
 type Tab = 'active' | 'history';
 
+type BookFormat = 'physical' | 'audiobook' | 'ebook';
+
+const FORMAT_ICON: Record<BookFormat, string> = {
+  physical: '📚',
+  audiobook: '🎧',
+  ebook: '📱',
+};
+
 interface Loan {
   loanId: string; ISBN: string; bookTitle: string; bookAuthor: string;
   checkoutDate: string; returnDueDate: string; returnedDate?: string;
   status: string; renewalCount: number; loanSK: string; isOverdue: boolean;
+  format?: BookFormat;
 }
 
 function daysUntil(iso: string): number {
@@ -143,12 +152,17 @@ export function MyLoansPage() {
             {active.map(loan => (
               <div key={loan.loanId}
                 className={`bg-white rounded-xl border p-4 flex items-start gap-4 ${loan.isOverdue ? 'border-red-200' : 'border-stone-100'}`}>
-                <div className="text-3xl mt-0.5">📖</div>
+                <div className="text-3xl mt-0.5">{FORMAT_ICON[loan.format ?? 'physical']}</div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-stone-900">{loan.bookTitle}</p>
                   <p className="text-sm text-stone-500 mb-2">{loan.bookAuthor}</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <RenewalBadge loan={loan} />
+                    {loan.format && loan.format !== 'physical' && (
+                      <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full capitalize">
+                        {loan.format === 'ebook' ? 'Kindle' : loan.format}
+                      </span>
+                    )}
                     {loan.renewalCount > 0 && (
                       <span className="text-xs text-brand-600 font-medium">Renewed once</span>
                     )}
@@ -179,9 +193,16 @@ export function MyLoansPage() {
           <div className="space-y-2">
             {history.map(loan => (
               <div key={loan.loanId} className="bg-white rounded-xl border border-stone-100 p-4 flex items-center gap-4">
-                <div className="text-2xl">📗</div>
+                <div className="text-2xl">{FORMAT_ICON[loan.format ?? 'physical']}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-stone-700 text-sm truncate">{loan.bookTitle}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-stone-700 text-sm truncate">{loan.bookTitle}</p>
+                    {loan.format && loan.format !== 'physical' && (
+                      <span className="text-xs bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded-full capitalize shrink-0">
+                        {loan.format === 'ebook' ? 'Kindle' : loan.format}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-stone-400">{loan.bookAuthor}</p>
                   <p className="text-xs text-stone-400 mt-0.5">
                     Checked out {new Date(loan.checkoutDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}

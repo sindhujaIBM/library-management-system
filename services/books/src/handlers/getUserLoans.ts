@@ -33,6 +33,7 @@ export const handler = withAuth(async (event: APIGatewayProxyEvent, auth) => {
     status: item.status,
     renewalCount: item.renewalCount,
     loanSK: item.SK,
+    format: item.format ?? 'physical',
     isOverdue: item.status === 'active' && item.returnDueDate < today,
   }));
 

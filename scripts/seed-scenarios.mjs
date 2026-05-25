@@ -52,15 +52,15 @@ async function updateBook(isbn, available, onLoan, lastBorrowedDate) {
   }));
 }
 
-function loan({ isbn, userId, userName, userEmail, bookTitle, bookAuthor, checkoutDate, returnDueDate, status, returnedDate, renewalCount = 0 }) {
+function loan({ isbn, userId, userName, userEmail, bookTitle, bookAuthor, bookGenre, checkoutDate, returnDueDate, status, returnedDate, renewalCount = 0, format = 'physical' }) {
   const sk = `LOAN#${userId}#${checkoutDate}`;
   return {
     PK: `LOAN#${isbn}`, SK: sk,
     entityType: 'LOAN',
     loanId: uuid(),
-    ISBN: isbn, userId, userEmail, userName, bookTitle, bookAuthor,
+    ISBN: isbn, userId, userEmail, userName, bookTitle, bookAuthor, bookGenre,
     checkoutDate, returnDueDate, returnedDate,
-    status, renewalCount,
+    status, renewalCount, format,
   };
 }
 
@@ -125,33 +125,33 @@ const [HD_ALICE, HD_BEN, HD_CAROL] = HIGH_DEMAND_BOOKS;
 // Books assigned to each member for their CURRENT active scenario loan
 // (all checked out 19 days ago → due in 2 days)
 const APPROACHING_RENEWAL = [
-  { member: MEMBERS[0], isbn: '978-0-14-028329-7', title: '1984',                     author: 'George Orwell' },
-  { member: MEMBERS[1], isbn: '978-0-7432-7356-5', title: 'The Great Gatsby',         author: 'F. Scott Fitzgerald' },
-  { member: MEMBERS[2], isbn: '978-0-7432-7359-6', title: 'Gone Girl',                author: 'Gillian Flynn' },
-  { member: MEMBERS[3], isbn: '978-0-06-112008-4', title: 'To Kill a Mockingbird',    author: 'Harper Lee' },
-  { member: MEMBERS[4], isbn: '978-0-316-76948-0', title: 'The Catcher in the Rye',  author: 'J.D. Salinger' },
-  { member: MEMBERS[5], isbn: '978-0-7432-7357-2', title: 'The Hobbit',              author: 'J.R.R. Tolkien' },
-  { member: MEMBERS[6], isbn: '978-0-385-54734-9', title: 'Educated',                author: 'Tara Westover' },
+  { member: MEMBERS[0], isbn: '978-0-14-028329-7', title: '1984',                     author: 'George Orwell',       genre: 'Science Fiction' },
+  { member: MEMBERS[1], isbn: '978-0-7432-7356-5', title: 'The Great Gatsby',         author: 'F. Scott Fitzgerald', genre: 'Fiction' },
+  { member: MEMBERS[2], isbn: '978-0-7432-7359-6', title: 'Gone Girl',                author: 'Gillian Flynn',        genre: 'Mystery' },
+  { member: MEMBERS[3], isbn: '978-0-06-112008-4', title: 'To Kill a Mockingbird',    author: 'Harper Lee',           genre: 'Fiction' },
+  { member: MEMBERS[4], isbn: '978-0-316-76948-0', title: 'The Catcher in the Rye',  author: 'J.D. Salinger',        genre: 'Fiction' },
+  { member: MEMBERS[5], isbn: '978-0-7432-7357-2', title: 'The Hobbit',              author: 'J.R.R. Tolkien',        genre: 'Fantasy' },
+  { member: MEMBERS[6], isbn: '978-0-385-54734-9', title: 'Educated',                author: 'Tara Westover',         genre: 'Biography' },
 ];
 
 // Books for due-today scenarios
 const DUE_TODAY = [
-  { member: MEMBERS[7], isbn: '978-0-525-55360-5', title: 'The Midnight Library', author: 'Matt Haig',        autoRenew: true },
-  { member: MEMBERS[8], isbn: '978-0-7432-7360-2', title: 'Sapiens',             author: 'Yuval Noah Harari', autoRenew: true },
-  { member: MEMBERS[9], isbn: '978-0-593-31012-3', title: 'Atomic Habits',       author: 'James Clear',       autoRenew: false },
+  { member: MEMBERS[7], isbn: '978-0-525-55360-5', title: 'The Midnight Library', author: 'Matt Haig',        genre: 'Fiction',   autoRenew: true },
+  { member: MEMBERS[8], isbn: '978-0-7432-7360-2', title: 'Sapiens',             author: 'Yuval Noah Harari', genre: 'History',   autoRenew: true },
+  { member: MEMBERS[9], isbn: '978-0-593-31012-3', title: 'Atomic Habits',       author: 'James Clear',       genre: 'Self-Help', autoRenew: false },
 ];
 
 // Books used for historical loans (cycling through existing catalog)
 const HISTORY_BOOKS = [
-  { isbn: '978-0-7432-7358-9', title: 'Dune',                              author: 'Frank Herbert' },
-  { isbn: '978-0-14-028428-7', title: "The Hitchhiker's Guide to the Galaxy", author: 'Douglas Adams' },
-  { isbn: '978-0-439-02348-1', title: "Harry Potter and the Sorcerer's Stone", author: 'J.K. Rowling' },
-  { isbn: '978-1-250-30177-4', title: 'And Then There Were None',          author: 'Agatha Christie' },
-  { isbn: '978-0-618-57494-1', title: 'The Fellowship of the Ring',        author: 'J.R.R. Tolkien' },
-  { isbn: '978-0-441-17271-9', title: 'Dune Messiah',                      author: 'Frank Herbert' },
-  { isbn: '978-0-618-57495-8', title: 'The Two Towers',                   author: 'J.R.R. Tolkien' },
-  { isbn: '978-0-8129-9429-2', title: 'A Brief History of Time',           author: 'Stephen Hawking' },
-  { isbn: '978-0-439-06486-6', title: 'Harry Potter and the Chamber of Secrets', author: 'J.K. Rowling' },
+  { isbn: '978-0-7432-7358-9', title: 'Dune',                                    author: 'Frank Herbert',   genre: 'Science Fiction' },
+  { isbn: '978-0-14-028428-7', title: "The Hitchhiker's Guide to the Galaxy",    author: 'Douglas Adams',   genre: 'Science Fiction' },
+  { isbn: '978-0-439-02348-1', title: "Harry Potter and the Sorcerer's Stone",   author: 'J.K. Rowling',   genre: 'Fantasy' },
+  { isbn: '978-1-250-30177-4', title: 'And Then There Were None',                author: 'Agatha Christie', genre: 'Mystery' },
+  { isbn: '978-0-618-57494-1', title: 'The Fellowship of the Ring',              author: 'J.R.R. Tolkien',  genre: 'Fantasy' },
+  { isbn: '978-0-441-17271-9', title: 'Dune Messiah',                            author: 'Frank Herbert',   genre: 'Science Fiction' },
+  { isbn: '978-0-618-57495-8', title: 'The Two Towers',                          author: 'J.R.R. Tolkien',  genre: 'Fantasy' },
+  { isbn: '978-0-8129-9429-2', title: 'A Brief History of Time',                 author: 'Stephen Hawking', genre: 'Science' },
+  { isbn: '978-0-439-06486-6', title: 'Harry Potter and the Chamber of Secrets', author: 'J.K. Rowling',   genre: 'Fantasy' },
 ];
 
 // ─── main ───────────────────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ for (let mi = 0; mi < MEMBERS.length; mi++) {
     const due       = daysAgo(offset);
     await write(loan({
       isbn: book.isbn, userId: m.userId, userName: m.name, userEmail: m.email,
-      bookTitle: book.title, bookAuthor: book.author,
+      bookTitle: book.title, bookAuthor: book.author, bookGenre: book.genre,
       checkoutDate: checkout, returnDueDate: due, returnedDate: due,
       status: 'returned', renewalCount: 0,
     }));
@@ -243,7 +243,7 @@ for (let bi = 0; bi < HIGH_DEMAND_BOOKS.length; bi++) {
     const due      = daysAgo(offset);
     await write(loan({
       isbn: book.ISBN, userId: m.userId, userName: m.name, userEmail: m.email,
-      bookTitle: book.title, bookAuthor: book.author,
+      bookTitle: book.title, bookAuthor: book.author, bookGenre: book.genre,
       checkoutDate: checkout, returnDueDate: due, returnedDate: due,
       status: 'returned', renewalCount: i > 4 ? 1 : 0,
     }));
@@ -256,7 +256,7 @@ for (let bi = 0; bi < HIGH_DEMAND_BOOKS.length; bi++) {
     const due      = daysFromNow(11 - bi);
     await write(loan({
       isbn: book.ISBN, userId: m.userId, userName: m.name, userEmail: m.email,
-      bookTitle: book.title, bookAuthor: book.author,
+      bookTitle: book.title, bookAuthor: book.author, bookGenre: book.genre,
       checkoutDate: checkout, returnDueDate: due,
       status: 'active', renewalCount: 0,
     }));
@@ -307,7 +307,7 @@ for (const { member, book } of NAMED_HOLDS) {
 
 // 8. Approaching-renewal active loans (members 1–7, checked out 14 days ago, due in 7 days)
 console.log('\n── Approaching renewal (due in 7 days) ─────');
-for (const { member: m, isbn, title, author } of APPROACHING_RENEWAL) {
+for (const { member: m, isbn, title, author, genre } of APPROACHING_RENEWAL) {
   // Delete any existing active loan for this member+book before recreating
   // (the checkoutDate is part of the SK so date changes require delete+recreate)
   const existing = await db.send(new QueryCommand({
@@ -325,7 +325,7 @@ for (const { member: m, isbn, title, author } of APPROACHING_RENEWAL) {
   const due      = daysFromNow(7);
   await write(loan({
     isbn, userId: m.userId, userName: m.name, userEmail: m.email,
-    bookTitle: title, bookAuthor: author,
+    bookTitle: title, bookAuthor: author, bookGenre: genre,
     checkoutDate: checkout, returnDueDate: due,
     status: 'active', renewalCount: 0,
   }));
@@ -341,7 +341,7 @@ for (const { member: m, isbn, title, author } of APPROACHING_RENEWAL) {
 
 // 9. Due-in-5-days loans (members 8–10, checked out 16 days ago)
 console.log('\n── Due in 5 days / auto-renewal eligible ───');
-for (const { member: m, isbn, title, author, autoRenew } of DUE_TODAY) {
+for (const { member: m, isbn, title, author, genre, autoRenew } of DUE_TODAY) {
   // Delete any existing active loan for this member+book before recreating
   const existing = await db.send(new QueryCommand({
     TableName: TABLE,
@@ -358,7 +358,7 @@ for (const { member: m, isbn, title, author, autoRenew } of DUE_TODAY) {
   const due      = daysFromNow(5);
   await write(loan({
     isbn, userId: m.userId, userName: m.name, userEmail: m.email,
-    bookTitle: title, bookAuthor: author,
+    bookTitle: title, bookAuthor: author, bookGenre: genre,
     checkoutDate: checkout, returnDueDate: due,
     status: 'active', renewalCount: 0,
   }));
@@ -389,6 +389,88 @@ if (existingBlock.Item) {
   console.log(`  ${blocker.name} → hold on "Atomic Habits" (blocks James Taylor's auto-renewal)`);
 }
 
+// 11. Digital format history — returned audiobook and ebook loans per member
+//     Gives the AI insights handler format-breakdown data to reason over.
+//     Each member has 2–4 digital loans spread across the last 3–5 months.
+//     Books chosen only from those with matching formats in the catalog.
+console.log('\n── Digital format history (audiobook + ebook) ──');
+
+// Format: { member index, isbn, title, author, format, daysAgoEnd }
+//   daysAgoEnd = how many days ago the loan ended (returnedDate = daysAgo(n), checkoutDate = daysAgo(n+21))
+//
+// Members with a clear format preference pattern (good for AI insights):
+//   Alice, Emma, Grace, Isabelle → audiobook-leaning
+//   Ben, Carol, David, Frank     → ebook-leaning
+//   Henry, James                 → mixed, just starting to try digital
+const DIGITAL_LOANS = [
+  // Alice (member_01) — audiobook reader, tried ebook once
+  { mi: 0, isbn: '978-0-14-028329-7', title: '1984',                         author: 'George Orwell',       format: 'audiobook', daysAgoEnd: 45 },
+  { mi: 0, isbn: '978-0-06-112008-4', title: 'To Kill a Mockingbird',        author: 'Harper Lee',          format: 'audiobook', daysAgoEnd: 90 },
+  { mi: 0, isbn: '978-0-7432-7358-9', title: 'Dune',                         author: 'Frank Herbert',       format: 'audiobook', daysAgoEnd: 130 },
+  { mi: 0, isbn: '978-0-385-54734-9', title: 'Educated',                     author: 'Tara Westover',       format: 'ebook',     daysAgoEnd: 60 },
+
+  // Ben (member_02) — ebook reader, switched from physical to ebook for travel
+  { mi: 1, isbn: '978-0-7432-7356-5', title: 'The Great Gatsby',             author: 'F. Scott Fitzgerald', format: 'ebook',     daysAgoEnd: 40 },
+  { mi: 1, isbn: '978-0-7432-7358-9', title: 'Dune',                         author: 'Frank Herbert',       format: 'ebook',     daysAgoEnd: 80 },
+  { mi: 1, isbn: '978-0-441-17271-9', title: 'Dune Messiah',                 author: 'Frank Herbert',       format: 'ebook',     daysAgoEnd: 110 },
+  { mi: 1, isbn: '978-0-8129-9429-2', title: 'A Brief History of Time',      author: 'Stephen Hawking',     format: 'ebook',     daysAgoEnd: 55 },
+
+  // Carol (member_03) — exclusively ebook, never takes physical books home
+  { mi: 2, isbn: '978-1-250-30177-4', title: 'And Then There Were None',     author: 'Agatha Christie',     format: 'ebook',     daysAgoEnd: 35 },
+  { mi: 2, isbn: '978-0-7432-7360-2', title: 'Sapiens',                      author: 'Yuval Noah Harari',   format: 'ebook',     daysAgoEnd: 75 },
+  { mi: 2, isbn: '978-0-593-31012-3', title: 'Atomic Habits',                author: 'James Clear',         format: 'ebook',     daysAgoEnd: 115 },
+  { mi: 2, isbn: '978-0-316-76948-0', title: 'The Catcher in the Rye',       author: 'J.D. Salinger',       format: 'ebook',     daysAgoEnd: 155 },
+
+  // David (member_04) — ebook reader, children's books for his kid
+  { mi: 3, isbn: '978-0-06-440055-8', title: "Charlotte's Web",              author: 'E.B. White',          format: 'ebook',     daysAgoEnd: 30 },
+  { mi: 3, isbn: '978-0-14-034488-5', title: 'Matilda',                      author: 'Roald Dahl',          format: 'ebook',     daysAgoEnd: 65 },
+  { mi: 3, isbn: '978-0-14-143955-6', title: 'The BFG',                      author: 'Roald Dahl',          format: 'ebook',     daysAgoEnd: 100 },
+
+  // Emma (member_05) — audiobook during commute
+  { mi: 4, isbn: '978-0-06-112008-4', title: 'To Kill a Mockingbird',        author: 'Harper Lee',          format: 'audiobook', daysAgoEnd: 50 },
+  { mi: 4, isbn: '978-0-7432-7357-2', title: 'The Hobbit',                   author: 'J.R.R. Tolkien',      format: 'audiobook', daysAgoEnd: 95 },
+  { mi: 4, isbn: '978-0-06-440055-8', title: "Charlotte's Web",              author: 'E.B. White',          format: 'audiobook', daysAgoEnd: 140 },
+
+  // Frank (member_06) — mixed: audiobook for fiction, ebook for non-fiction
+  { mi: 5, isbn: '978-0-7432-7358-9', title: 'Dune',                         author: 'Frank Herbert',       format: 'audiobook', daysAgoEnd: 42 },
+  { mi: 5, isbn: '978-0-593-31012-3', title: 'Atomic Habits',                author: 'James Clear',         format: 'ebook',     daysAgoEnd: 70 },
+  { mi: 5, isbn: '978-0-7432-7360-2', title: 'Sapiens',                      author: 'Yuval Noah Harari',   format: 'ebook',     daysAgoEnd: 105 },
+  { mi: 5, isbn: '978-0-618-57494-1', title: 'The Fellowship of the Ring',   author: 'J.R.R. Tolkien',      format: 'audiobook', daysAgoEnd: 145 },
+
+  // Grace (member_07) — heavy audiobook user
+  { mi: 6, isbn: '978-0-14-028428-7', title: "The Hitchhiker's Guide",       author: 'Douglas Adams',       format: 'audiobook', daysAgoEnd: 38 },
+  { mi: 6, isbn: '978-0-618-57494-1', title: 'The Fellowship of the Ring',   author: 'J.R.R. Tolkien',      format: 'audiobook', daysAgoEnd: 80 },
+  { mi: 6, isbn: '978-0-618-57495-8', title: 'The Two Towers',               author: 'J.R.R. Tolkien',      format: 'audiobook', daysAgoEnd: 120 },
+  { mi: 6, isbn: '978-0-439-02348-1', title: "Harry Potter and the Sorcerer's Stone", author: 'J.K. Rowling', format: 'audiobook', daysAgoEnd: 55 },
+
+  // Henry (member_08) — first time trying audiobook (was always physical)
+  { mi: 7, isbn: '978-0-14-028329-7', title: '1984',                         author: 'George Orwell',       format: 'audiobook', daysAgoEnd: 28 },
+  { mi: 7, isbn: '978-0-7432-7358-9', title: 'Dune',                         author: 'Frank Herbert',       format: 'audiobook', daysAgoEnd: 85 },
+
+  // Isabelle (member_09) — audiobook devotee, also uses ebook for children's books for daughter
+  { mi: 8, isbn: '978-0-385-54734-9', title: 'Educated',                     author: 'Tara Westover',       format: 'audiobook', daysAgoEnd: 33 },
+  { mi: 8, isbn: '978-0-06-112008-4', title: 'To Kill a Mockingbird',        author: 'Harper Lee',          format: 'audiobook', daysAgoEnd: 72 },
+  { mi: 8, isbn: '978-0-14-034488-5', title: 'Matilda',                      author: 'Roald Dahl',          format: 'ebook',     daysAgoEnd: 48 },
+  { mi: 8, isbn: '978-0-06-440055-8', title: "Charlotte's Web",              author: 'E.B. White',          format: 'audiobook', daysAgoEnd: 110 },
+
+  // James (member_10) — just discovered ebooks, switching from physical
+  { mi: 9, isbn: '978-0-8129-9429-2', title: 'A Brief History of Time',      author: 'Stephen Hawking',     format: 'ebook',     daysAgoEnd: 22 },
+  { mi: 9, isbn: '978-0-441-17271-9', title: 'Dune Messiah',                 author: 'Frank Herbert',       format: 'ebook',     daysAgoEnd: 58 },
+];
+
+for (const entry of DIGITAL_LOANS) {
+  const m = MEMBERS[entry.mi];
+  const checkout  = daysAgo(entry.daysAgoEnd + 21);
+  const due       = daysAgo(entry.daysAgoEnd);
+  await write(loan({
+    isbn: entry.isbn, userId: m.userId, userName: m.name, userEmail: m.email,
+    bookTitle: entry.title, bookAuthor: entry.author,
+    checkoutDate: checkout, returnDueDate: due, returnedDate: due,
+    status: 'returned', renewalCount: 0, format: entry.format,
+  }));
+}
+console.log(`  ${DIGITAL_LOANS.length} digital loans written (${DIGITAL_LOANS.filter(d => d.format === 'audiobook').length} audiobook, ${DIGITAL_LOANS.filter(d => d.format === 'ebook').length} ebook)`);
+
 // ─── summary ────────────────────────────────────────────────────────────────
 
 console.log(`
@@ -404,5 +486,9 @@ Scenarios ready to test:
   Auto-renewal     → Henry + Isabelle due in 5 days, no holds → eligible for renewal
   No auto-renewal  → James due in 5 days, David is in hold queue → must return
   Loan insights    → 160+ loan records across 6 months of history
+  Digital formats  → 34 digital loans (audiobook + ebook) across all 10 members
+                     Alice/Emma/Grace/Isabelle → audiobook-heavy
+                     Ben/Carol/David/Frank → ebook-heavy
+                     Henry/James → just switching from physical
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `);

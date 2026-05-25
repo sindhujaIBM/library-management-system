@@ -10,6 +10,7 @@ interface Book {
   totalCopies: number;
   coverImageUrl?: string;
   series?: string;
+  formats?: string[];
 }
 
 export function BookCard({ book }: { book: Book }) {
@@ -66,10 +67,16 @@ export function BookCard({ book }: { book: Book }) {
       <div className="p-3">
         <h3 className="font-semibold text-sm text-stone-900 line-clamp-2 group-hover:text-brand-700 transition-colors">{book.title}</h3>
         <p className="text-xs text-stone-500 mt-0.5">{book.author}</p>
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
           <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full">{book.genre}</span>
           {book.series && <span className="text-xs text-brand-600 truncate">{book.series}</span>}
         </div>
+        {book.formats && book.formats.length > 0 && (
+          <div className="flex gap-1 mt-1.5">
+            {book.formats.includes('audiobook') && <span title="Audiobook" className="text-xs">🎧</span>}
+            {book.formats.includes('ebook') && <span title="eBook / Kindle" className="text-xs">📱</span>}
+          </div>
+        )}
       </div>
     </Link>
   );

@@ -4,12 +4,20 @@ import { booksClient } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 
+type BookFormat = 'physical' | 'audiobook' | 'ebook';
+
 interface Book {
   ISBN: string; title: string; author: string; genre: string;
   series?: string; seriesPosition?: number; releaseDate?: string;
   totalCopies: number; availableCopies: number; copiesOnLoan: number;
-  coverImageUrl?: string; holdCount: number;
+  coverImageUrl?: string; holdCount: number; formats?: BookFormat[];
 }
+
+const FORMAT_LABELS: Record<BookFormat, { label: string; icon: string }> = {
+  physical: { label: 'Physical', icon: '📚' },
+  audiobook: { label: 'Audiobook', icon: '🎧' },
+  ebook: { label: 'Kindle / eBook', icon: '📱' },
+};
 
 export function BookDetailPage() {
   const { isbn } = useParams<{ isbn: string }>();
@@ -22,6 +30,7 @@ export function BookDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState<BookFormat>('physical');
 
   const inCart = isbn ? isInCart(isbn) : false;
 
@@ -31,7 +40,10 @@ export function BookDetailPage() {
       booksClient.get(`/books/${isbn}`),
       user ? booksClient.get(`/holds/${isbn}/me`) : Promise.resolve(null),
     ]).then(([bookRes, holdRes]) => {
-      setBook(bookRes.data.data);
+      const bookData = bookRes.data.data;
+      setBook(bookData);
+      const formats: BookFormat[] = bookData.formats ?? ['physical'];
+      setSelectedFormat(formats[0]);
       setMyHold(!!holdRes?.data?.data?.hold);
     }).catch(() => navigate('/')).finally(() => setLoading(false));
   }, [isbn, user, navigate]);
@@ -39,10 +51,14 @@ export function BookDetailPage() {
   async function handleBorrowNow() {
     if (!isbn) return;
     setActionLoading(true); setMessage(null);
+    const isDigital = selectedFormat === 'audiobook' || selectedFormat === 'ebook';
     try {
-      await booksClient.post('/loans/checkout', { ISBN: isbn });
-      setMessage({ type: 'success', text: 'Book borrowed successfully! Due in 21 days.' });
-      setBook(b => b ? { ...b, availableCopies: b.availableCopies - 1, copiesOnLoan: b.copiesOnLoan + 1 } : b);
+      await booksClient.post('/loans/checkout', { ISBN: isbn, format: selectedFormat });
+      const fmtLabel = FORMAT_LABELS[selectedFormat].label;
+      setMessage({ type: 'success', text: `${fmtLabel} borrowed successfully! Due in 21 days.` });
+      if (!isDigital) {
+        setBook(b => b ? { ...b, availableCopies: b.availableCopies - 1, copiesOnLoan: b.copiesOnLoan + 1 } : b);
+      }
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error?.message
@@ -142,31 +158,62 @@ export function BookDetailPage() {
             )}
 
             {user ? (
-              <div className="flex flex-wrap gap-3">
-                {available && (
-                  <>
-                    <button onClick={handleBorrowNow} disabled={actionLoading}
-                      className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                      {actionLoading ? '…' : 'Borrow Now'}
-                    </button>
-                    <button onClick={handleCartToggle}
-                      className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors border ${
-                        inCart
-                          ? 'bg-brand-50 border-brand-300 text-brand-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
-                          : 'bg-white border-stone-200 text-stone-700 hover:border-brand-400 hover:text-brand-700'
+              <div className="space-y-3">
+                {/* Format selector */}
+                {book.formats && book.formats.length > 1 && (
+                  <div className="flex gap-2">
+                    {book.formats.map(fmt => {
+                      const f = fmt as BookFormat;
+                      const meta = FORMAT_LABELS[f];
+                      return (
+                        <button key={f} onClick={() => setSelectedFormat(f)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                            selectedFormat === f
+                              ? 'bg-brand-50 border-brand-400 text-brand-700'
+                              : 'border-stone-200 text-stone-500 hover:border-stone-300'
+                          }`}>
+                          <span>{meta.icon}</span>
+                          <span>{meta.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {book.formats && book.formats.length === 1 && (
+                  <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                    <span>{FORMAT_LABELS[book.formats[0] as BookFormat]?.icon}</span>
+                    <span>{FORMAT_LABELS[book.formats[0] as BookFormat]?.label} only</span>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3">
+                  {(selectedFormat !== 'physical' || available) && (
+                    <>
+                      <button onClick={handleBorrowNow} disabled={actionLoading}
+                        className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                        {actionLoading ? '…' : `Borrow ${FORMAT_LABELS[selectedFormat].icon}`}
+                      </button>
+                      {selectedFormat === 'physical' && (
+                        <button onClick={handleCartToggle}
+                          className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                            inCart
+                              ? 'bg-brand-50 border-brand-300 text-brand-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
+                              : 'bg-white border-stone-200 text-stone-700 hover:border-brand-400 hover:text-brand-700'
+                          }`}>
+                          {inCart ? '✓ In cart — remove' : '+ Add to cart'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {selectedFormat === 'physical' && !available && (
+                    <button onClick={handleHold} disabled={actionLoading}
+                      className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+                        myHold ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-amber-500 hover:bg-amber-600 text-white'
                       }`}>
-                      {inCart ? '✓ In cart — remove' : '+ Add to cart'}
+                      {actionLoading ? '…' : myHold ? 'Cancel Hold' : 'Place Hold'}
                     </button>
-                  </>
-                )}
-                {!available && (
-                  <button onClick={handleHold} disabled={actionLoading}
-                    className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
-                      myHold ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-amber-500 hover:bg-amber-600 text-white'
-                    }`}>
-                    {actionLoading ? '…' : myHold ? 'Cancel Hold' : 'Place Hold'}
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
             ) : (
               <p className="text-sm text-stone-500">

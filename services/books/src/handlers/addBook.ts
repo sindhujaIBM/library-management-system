@@ -9,7 +9,7 @@ export const handler = withAuth(async (event: APIGatewayProxyEvent, _auth) => {
   const body = JSON.parse(event.body) as {
     ISBN?: string; title?: string; author?: string; genre?: string;
     series?: string; seriesPosition?: number; releaseDate?: string;
-    totalCopies?: number; coverImageUrl?: string;
+    totalCopies?: number; coverImageUrl?: string; formats?: string[];
   };
 
   if (!body.ISBN) throw new ValidationError('ISBN is required');
@@ -42,6 +42,7 @@ export const handler = withAuth(async (event: APIGatewayProxyEvent, _auth) => {
     availableCopies: body.totalCopies,
     copiesOnLoan: 0,
     coverImageUrl: body.coverImageUrl,
+    formats: body.formats ?? ['physical'],
     createdAt: now,
     updatedAt: now,
   };

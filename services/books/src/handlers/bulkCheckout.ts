@@ -93,6 +93,7 @@ export const handler = withAuth(async (event: APIGatewayProxyEvent, auth) => {
                 returnDueDate,
                 status: 'active',
                 renewalCount: 0,
+                format: 'physical',
               },
             },
           },
