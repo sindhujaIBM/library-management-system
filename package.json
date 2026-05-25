@@ -22,7 +22,8 @@
     "seed": "node scripts/seed.mjs",
     "seed:scenarios": "node scripts/seed-scenarios.mjs",
     "seed:alerts": "node scripts/seed-alerts.mjs",
-    "make-librarian": "node scripts/make-librarian.mjs"
+    "make-librarian": "node scripts/make-librarian.mjs",
+    "prepare": "cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
