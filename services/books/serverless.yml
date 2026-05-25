@@ -17,7 +17,7 @@ provider:
     NODE_ENV: ${self:provider.stage}
     JWT_SECRET: ${env:JWT_SECRET}
     DYNAMO_TABLE: ${env:DYNAMO_TABLE, 'library-dev'}
-    CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:5173'}
+    CORS_ORIGIN: ${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}
     SES_FROM_EMAIL: ${env:SES_FROM_EMAIL, 'noreply@maidlink.ca'}
     SES_CONFIG_SET: ${env:SES_CONFIG_SET, 'MaidlinkConfigSet-prod'}
   iam:
@@ -132,7 +132,7 @@ functions:
           path: /books
           method: get
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -143,7 +143,7 @@ functions:
           path: /books/{isbn}
           method: get
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -154,7 +154,7 @@ functions:
           path: /books
           method: post
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -165,7 +165,7 @@ functions:
           path: /books/{isbn}
           method: put
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -176,7 +176,7 @@ functions:
           path: /books/{isbn}
           method: delete
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -187,7 +187,7 @@ functions:
           path: /loans/checkout
           method: post
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -198,7 +198,7 @@ functions:
           path: /loans/checkout/bulk
           method: post
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -209,7 +209,7 @@ functions:
           path: /loans/checkin
           method: post
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -220,7 +220,7 @@ functions:
           path: /loans/user/{userId}
           method: get
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -231,7 +231,7 @@ functions:
           path: /holds
           method: post
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -242,7 +242,7 @@ functions:
           path: /holds/{isbn}
           method: delete
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -253,11 +253,15 @@ functions:
           path: /holds/{isbn}/me
           method: get
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
 custom:
+  corsOriginDefault: ${self:custom.corsOriginByStage.${self:provider.stage}, 'http://localhost:5173'}
+  corsOriginByStage:
+    prod: 'https://d360m6tattqe2h.cloudfront.net'
+    dev: 'http://localhost:5173'
   esbuild:
     bundle: true
     minify: false

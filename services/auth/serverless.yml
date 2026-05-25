@@ -19,7 +19,7 @@ provider:
     GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
     GOOGLE_CLIENT_SECRET: ${env:GOOGLE_CLIENT_SECRET}
     DYNAMO_TABLE: ${env:DYNAMO_TABLE, 'library-dev'}
-    CORS_ORIGIN: ${env:CORS_ORIGIN, 'http://localhost:5173'}
+    CORS_ORIGIN: ${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}
   iam:
     role:
       statements:
@@ -39,7 +39,7 @@ functions:
           path: /auth/google
           method: post
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -50,7 +50,7 @@ functions:
           path: /auth/me
           method: get
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
@@ -61,11 +61,15 @@ functions:
           path: /users/{userId}/role
           method: put
           cors:
-            origin: "${env:CORS_ORIGIN, 'http://localhost:5173'}"
+            origin: "${ssm:/library/${self:provider.stage}/cors-origin, env:CORS_ORIGIN, 'http://localhost:5173'}"
             headers: [Content-Type, Authorization]
             allowCredentials: true
 
 custom:
+  corsOriginDefault: ${self:custom.corsOriginByStage.${self:provider.stage}, 'http://localhost:5173'}
+  corsOriginByStage:
+    prod: 'https://d360m6tattqe2h.cloudfront.net'
+    dev: 'http://localhost:5173'
   esbuild:
     bundle: true
     minify: false

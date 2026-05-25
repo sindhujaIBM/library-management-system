@@ -18,8 +18,8 @@ export const handler = withAuth(async (_event: APIGatewayProxyEvent, _auth) => {
       TableName: TABLE,
       FilterExpression: 'entityType = :et',
       ExpressionAttributeValues: { ':et': 'LOAN' },
-      ProjectionExpression: 'ISBN, bookTitle, bookAuthor, bookGenre, checkoutDate, returnedDate, #status, renewalCount, format',
-      ExpressionAttributeNames: { '#status': 'status' },
+      ProjectionExpression: 'ISBN, bookTitle, bookAuthor, bookGenre, checkoutDate, returnedDate, #status, renewalCount, #fmt',
+      ExpressionAttributeNames: { '#status': 'status', '#fmt': 'format' },
       ExclusiveStartKey: lastKey,
     }));
     loans.push(...(page.Items ?? []));
