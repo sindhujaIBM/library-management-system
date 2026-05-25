@@ -15,13 +15,20 @@
     "dev": "npm run build --workspace=packages/shared && concurrently -n auth,books,admin,web -c cyan,green,yellow,white \"npm run offline --workspace=services/auth\" \"npm run offline --workspace=services/books\" \"npm run offline --workspace=services/admin\" \"npm run dev --workspace=frontend\"",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspace=packages/shared && npm run test --workspace=services/books && npm run test --workspace=services/admin && npm run test --workspace=frontend",
+    "test:coverage": "npm run test --workspaces --if-present",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "seed": "node scripts/seed.mjs",
     "seed:scenarios": "node scripts/seed-scenarios.mjs",
     "seed:alerts": "node scripts/seed-alerts.mjs",
     "make-librarian": "node scripts/make-librarian.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@vitest/coverage-v8": "^4.1.7",
     "concurrently": "^8.2.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.7"
   }
 }

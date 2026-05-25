@@ -5,12 +5,14 @@
   "scripts": {
     "offline": "npx serverless offline",
     "deploy": "npx serverless deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@library/shared": "*",
     "@aws-sdk/client-dynamodb": "^3.600.0",
     "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "@library/shared": "*",
     "jsonwebtoken": "^9.0.2",
     "uuid": "^9.0.1"
   },
@@ -19,9 +21,11 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.0.0",
     "@types/uuid": "^9.0.8",
+    "aws-sdk-client-mock": "^4.1.0",
     "serverless": "^3.38.0",
     "serverless-esbuild": "^1.52.1",
     "serverless-offline": "^13.6.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.7"
   }
 }
