@@ -122,11 +122,18 @@ describe('getLoanInsights handler', () => {
   });
 
   it('handles paginated DynamoDB scan (two pages)', async () => {
+    // scanAllLoans and countBooks run in parallel — both call ScanCommand.
+    // Call order (single-threaded): loans page 1 → countBooks → loans page 2.
     mockDynamo
       .on(ScanCommand)
       .resolvesOnce({
         Items: [sampleLoans[0]],
         LastEvaluatedKey: { PK: 'LOAN#978-page1-last' },
+      })
+      .resolvesOnce({
+        // countBooks uses Select: COUNT — returns Count, not Items
+        Count: 10,
+        LastEvaluatedKey: undefined,
       })
       .resolvesOnce({
         Items: [sampleLoans[1]],
@@ -139,9 +146,11 @@ describe('getLoanInsights handler', () => {
 
     const result = await handler(makeEvent('librarian'));
     expect(result.statusCode).toBe(200);
-    expect(JSON.parse(result.body).data.data.totalLoans).toBe(2);
-    // DynamoDB was called exactly twice (once per page)
-    expect(mockDynamo.commandCalls(ScanCommand)).toHaveLength(2);
+    const body = JSON.parse(result.body).data.data;
+    expect(body.totalLoans).toBe(2);
+    expect(body.totalBooks).toBe(10);
+    // loans page 1 + countBooks + loans page 2 = 3 ScanCommand calls
+    expect(mockDynamo.commandCalls(ScanCommand)).toHaveLength(3);
   });
 
   it('reports renewal rate based on loans with renewalCount > 0', async () => {

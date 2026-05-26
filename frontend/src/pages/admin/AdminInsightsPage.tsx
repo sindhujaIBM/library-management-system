@@ -1,16 +1,34 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { adminClient } from '../../api/client';
 
 interface InsightsData {
   insights: string;
   data: {
+    totalBooks: number;
     totalLoans: number;
+    activeLoans: number;
+    overdueLoans: number;
+    activeMembers: number;
+    overdueBuckets: { '1-7 days': number; '8-14 days': number; '15-30 days': number; '30+ days': number };
     topGenres: [string, number][];
     topAuthors: [string, number][];
     monthlyTrend: [string, number][];
+    byFormat: { physical: number; audiobook: number; ebook: number };
+    analysisPeriod: { from: string; to: string };
   };
   generatedAt: string;
+}
+
+function StatCard({ value, label, sub, accent }: { value: string | number; label: string; sub?: string; accent?: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4">
+      <p className={`text-3xl font-bold ${accent ?? 'text-stone-900'}`}>{value}</p>
+      <p className="text-xs text-stone-400 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-stone-400 mt-0.5">{sub}</p>}
+    </div>
+  );
 }
 
 export function AdminInsightsPage() {
@@ -26,8 +44,11 @@ export function AdminInsightsPage() {
     finally { setLoading(false); }
   }
 
-  const maxGenreCount = result?.data.topGenres[0]?.[1] ?? 1;
-  const maxMonthCount = result ? Math.max(...result.data.monthlyTrend.map(([, c]) => c)) : 1;
+  const d = result?.data;
+  const maxGenreCount = d?.topGenres[0]?.[1] ?? 1;
+  const maxMonthCount = d ? Math.max(...d.monthlyTrend.map(([, c]) => c)) : 1;
+  const totalOverdue = d ? Object.values(d.overdueBuckets).reduce((a, b) => a + b, 0) : 0;
+  const overdueRate = d?.activeLoans ? ((d.overdueLoans / d.activeLoans) * 100).toFixed(1) : '0';
 
   return (
     <div>
@@ -58,37 +79,96 @@ export function AdminInsightsPage() {
         </div>
       )}
 
-      {result && (
+      {result && d && (
         <div className="space-y-5">
 
-          {/* Stats row */}
+          {/* Stats — row 1 */}
           <div className="grid grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4 text-center">
-              <p className="text-3xl font-bold text-stone-900">{result.data.totalLoans}</p>
-              <p className="text-xs text-stone-400 mt-0.5">Total Loans</p>
-            </div>
-            <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4 text-center">
-              <p className="text-3xl font-bold text-stone-900">{result.data.topGenres.length}</p>
-              <p className="text-xs text-stone-400 mt-0.5">Active Genres</p>
-            </div>
-            <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4 text-center">
-              <p className="text-3xl font-bold text-stone-900">{result.data.topAuthors.length}</p>
-              <p className="text-xs text-stone-400 mt-0.5">Top Authors</p>
-            </div>
+            <StatCard value={d.totalBooks} label="Books in Catalog" />
+            <StatCard value={d.activeMembers} label="Active Members" sub="unique borrowers" />
+            <StatCard
+              value={`${d.analysisPeriod.from} → ${d.analysisPeriod.to}`}
+              label="Analysis Period"
+            />
           </div>
 
-          {/* Charts row */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Stats — row 2 */}
+          <div className="grid grid-cols-3 gap-4">
+            <StatCard value={d.totalLoans} label="Total Loans" />
+            <StatCard value={d.activeLoans} label="Active Loans" />
+            <StatCard
+              value={d.overdueLoans}
+              label="Overdue Loans"
+              sub={`${overdueRate}% of active`}
+              accent={d.overdueLoans > 0 ? 'text-red-600' : 'text-stone-900'}
+            />
+          </div>
 
-            {/* Genre bar chart */}
+          {/* Format breakdown */}
+          <div className="grid grid-cols-3 gap-4">
+            {([
+              { key: 'physical', label: 'Physical', icon: '📚' },
+              { key: 'audiobook', label: 'Audiobook', icon: '🎧' },
+              { key: 'ebook',    label: 'Ebook / Kindle', icon: '📱' },
+            ] as const).map(({ key, label, icon }) => {
+              const count = d.byFormat[key];
+              const pct = d.totalLoans > 0 ? ((count / d.totalLoans) * 100).toFixed(0) : '0';
+              return (
+                <div key={key} className="bg-white rounded-xl border border-stone-100 shadow-sm p-4 flex items-center gap-4">
+                  <span className="text-2xl">{icon}</span>
+                  <div>
+                    <p className="text-2xl font-bold text-stone-900">{count}</p>
+                    <p className="text-xs text-stone-400">{label} · {pct}%</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Overdue severity */}
+          {totalOverdue > 0 && (
+            <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+              <h3 className="font-semibold text-stone-700 text-sm mb-4">Overdue Severity</h3>
+              <div className="grid grid-cols-4 gap-3">
+                {([
+                  { key: '1-7 days',   label: '1–7 days',   color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
+                  { key: '8-14 days',  label: '8–14 days',  color: 'bg-orange-50 border-orange-200 text-orange-700' },
+                  { key: '15-30 days', label: '15–30 days', color: 'bg-red-50 border-red-200 text-red-700' },
+                  { key: '30+ days',   label: '30+ days',   color: 'bg-red-100 border-red-300 text-red-800' },
+                ] as const).map(({ key, label, color }) => (
+                  <div key={key} className={`rounded-lg border p-3 text-center ${color}`}>
+                    <p className="text-2xl font-bold">{d.overdueBuckets[key]}</p>
+                    <p className="text-xs mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Stacked proportion bar */}
+              <div className="mt-4 h-2 rounded-full overflow-hidden flex gap-0.5">
+                {([
+                  { key: '1-7 days',   bg: 'bg-yellow-400' },
+                  { key: '8-14 days',  bg: 'bg-orange-400' },
+                  { key: '15-30 days', bg: 'bg-red-400' },
+                  { key: '30+ days',   bg: 'bg-red-700' },
+                ] as const).map(({ key, bg }) => {
+                  const w = totalOverdue > 0 ? (d.overdueBuckets[key] / totalOverdue) * 100 : 0;
+                  return w > 0 ? <div key={key} className={`h-full ${bg}`} style={{ width: `${w}%` }} /> : null;
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Genre + Monthly charts */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
               <h3 className="font-semibold text-stone-700 text-sm mb-4">Top Genres</h3>
               <div className="space-y-3">
-                {result.data.topGenres.map(([genre, count]) => (
+                {d.topGenres.map(([genre, count]) => (
                   <div key={genre}>
                     <div className="flex justify-between text-xs text-stone-500 mb-1">
                       <span>{genre}</span>
-                      <span className="font-medium text-stone-700">{count}</span>
+                      <span className="font-medium text-stone-700">
+                        {count} · {d.totalLoans > 0 ? ((count / d.totalLoans) * 100).toFixed(0) : 0}%
+                      </span>
                     </div>
                     <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
                       <div
@@ -101,11 +181,10 @@ export function AdminInsightsPage() {
               </div>
             </div>
 
-            {/* Monthly trend bar chart */}
             <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
               <h3 className="font-semibold text-stone-700 text-sm mb-4">Checkouts per Month</h3>
               <div className="flex items-end gap-2 h-28">
-                {result.data.monthlyTrend.map(([month, count]) => (
+                {d.monthlyTrend.map(([month, count]) => (
                   <div key={month} className="flex-1 flex flex-col items-center gap-1">
                     <span className="text-xs font-medium text-stone-600">{count}</span>
                     <div
@@ -123,7 +202,7 @@ export function AdminInsightsPage() {
           <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
             <h3 className="font-semibold text-stone-700 text-sm mb-3">Top Authors</h3>
             <div className="flex flex-wrap gap-2">
-              {result.data.topAuthors.map(([author, count], i) => (
+              {d.topAuthors.map(([author, count], i) => (
                 <span key={author}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium ${
                     i === 0 ? 'bg-brand-100 text-brand-800' :
@@ -152,8 +231,13 @@ export function AdminInsightsPage() {
               prose-p:text-stone-600 prose-p:leading-relaxed prose-p:my-1
               prose-strong:text-stone-800 prose-strong:font-semibold
               prose-ul:my-1 prose-li:text-stone-600 prose-li:my-0.5
-              prose-ol:my-1">
-              <ReactMarkdown>{result.insights}</ReactMarkdown>
+              prose-ol:my-1
+              prose-table:w-full prose-table:text-xs
+              prose-thead:bg-stone-50
+              prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-stone-700 prose-th:border prose-th:border-stone-200
+              prose-td:px-3 prose-td:py-2 prose-td:text-stone-600 prose-td:border prose-td:border-stone-100
+              prose-tr:even:bg-stone-50/50">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.insights}</ReactMarkdown>
             </div>
           </div>
 
