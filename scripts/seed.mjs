@@ -42,7 +42,7 @@ const BOOKS = [
     totalCopies: 4,
     releaseDate: '1949-06-08',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780140283297-M.jpg',
-    formats: ['physical', 'audiobook', 'ebook'],
+    formats: ['physical', 'ebook'],
   },
   {
     ISBN: '978-0-7432-7356-5',
@@ -52,7 +52,7 @@ const BOOKS = [
     totalCopies: 2,
     releaseDate: '1925-04-10',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780743273565-M.jpg',
-    formats: ['physical', 'ebook'],
+    formats: ['physical', 'audiobook', 'ebook'],
   },
   {
     ISBN: '978-0-316-76948-0',
@@ -86,7 +86,7 @@ const BOOKS = [
     seriesPosition: 1,
     totalCopies: 2,
     releaseDate: '1954-07-29',
-    formats: ['physical', 'audiobook', 'ebook'],
+    formats: ['physical', 'audiobook'],
   },
   {
     ISBN: '978-0-618-57495-8',
@@ -97,7 +97,7 @@ const BOOKS = [
     seriesPosition: 2,
     totalCopies: 2,
     releaseDate: '1954-11-11',
-    formats: ['physical', 'audiobook', 'ebook'],
+    formats: ['ebook'],
   },
   {
     ISBN: '978-0-7432-7358-9',
@@ -120,7 +120,7 @@ const BOOKS = [
     seriesPosition: 2,
     totalCopies: 2,
     releaseDate: '1969-06-01',
-    formats: ['physical', 'ebook'],
+    formats: ['audiobook', 'ebook'],
   },
   {
     ISBN: '978-0-14-028428-7',
@@ -143,7 +143,7 @@ const BOOKS = [
     totalCopies: 3,
     releaseDate: '2012-06-05',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780307588371-M.jpg',
-    formats: ['physical', 'audiobook', 'ebook'],
+    formats: ['physical', 'audiobook'],
   },
   {
     ISBN: '978-0-06-093546-9',
@@ -163,7 +163,7 @@ const BOOKS = [
     totalCopies: 3,
     releaseDate: '1939-11-01',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9781250301772-M.jpg',
-    formats: ['physical', 'ebook'],
+    formats: ['physical'],
   },
   // ── Non-Fiction ────────────────────────────────────────────────────────────
   {
@@ -184,7 +184,7 @@ const BOOKS = [
     totalCopies: 2,
     releaseDate: '2018-02-20',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780399590504-M.jpg',
-    formats: ['physical', 'audiobook', 'ebook'],
+    formats: ['audiobook', 'ebook'],
   },
   {
     ISBN: '978-0-593-31012-3',
@@ -204,7 +204,7 @@ const BOOKS = [
     totalCopies: 3,
     releaseDate: '2011-01-01',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780062316097-M.jpg',
-    formats: ['physical', 'audiobook', 'ebook'],
+    formats: ['physical', 'ebook'],
   },
   {
     ISBN: '978-0-8129-9429-2',
@@ -214,7 +214,7 @@ const BOOKS = [
     totalCopies: 2,
     releaseDate: '1988-04-01',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780812994293-M.jpg',
-    formats: ['physical', 'ebook'],
+    formats: ['physical'],
   },
   // ── Harry Potter ───────────────────────────────────────────────────────────
   {
@@ -239,7 +239,7 @@ const BOOKS = [
     totalCopies: 4,
     releaseDate: '1998-07-02',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780439064866-M.jpg',
-    formats: ['physical', 'audiobook', 'ebook'],
+    formats: ['physical', 'ebook'],
   },
   // ── Children's Books ───────────────────────────────────────────────────────
   {
@@ -260,7 +260,7 @@ const BOOKS = [
     totalCopies: 3,
     releaseDate: '1963-04-09',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780060254926-M.jpg',
-    formats: ['physical', 'ebook'],
+    formats: ['physical'],
   },
   {
     ISBN: '978-0-06-440055-8',
@@ -280,7 +280,7 @@ const BOOKS = [
     totalCopies: 5,
     releaseDate: '1947-09-03',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780060287658-M.jpg',
-    formats: ['physical', 'ebook'],
+    formats: ['physical'],
   },
   {
     ISBN: '978-0-394-80001-1',
@@ -300,7 +300,7 @@ const BOOKS = [
     totalCopies: 4,
     releaseDate: '1960-08-12',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780394800165-M.jpg',
-    formats: ['physical', 'ebook'],
+    formats: ['ebook'],
   },
   {
     ISBN: '978-0-14-034488-5',
@@ -320,7 +320,7 @@ const BOOKS = [
     totalCopies: 3,
     releaseDate: '1982-09-01',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780141308005-M.jpg',
-    formats: ['physical', 'audiobook', 'ebook'],
+    formats: ['physical', 'audiobook'],
   },
   {
     ISBN: '978-0-8109-9313-8',
@@ -344,7 +344,7 @@ const BOOKS = [
     totalCopies: 4,
     releaseDate: '1997-09-01',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780590846271-M.jpg',
-    formats: ['physical', 'ebook'],
+    formats: ['physical'],
   },
   {
     ISBN: '978-0-316-38060-1',
@@ -354,7 +354,7 @@ const BOOKS = [
     totalCopies: 3,
     releaseDate: '1985-10-28',
     coverImageUrl: 'https://covers.openlibrary.org/b/isbn/9780316380607-M.jpg',
-    formats: ['physical', 'ebook'],
+    formats: ['physical', 'audiobook', 'ebook'],
   },
   {
     ISBN: '978-0-7636-4699-7',
@@ -375,8 +375,9 @@ async function seedBook(book) {
   }));
 
   if (existing.Item) {
-    // Backfill formats on existing books that don't have them yet
-    if (!existing.Item.formats) {
+    const currentFormats = JSON.stringify([...(existing.Item.formats ?? [])].sort());
+    const desiredFormats = JSON.stringify([...(book.formats ?? ['physical'])].sort());
+    if (currentFormats !== desiredFormats) {
       await db.send(new UpdateCommand({
         TableName: TABLE,
         Key: { PK: `BOOK#${book.ISBN}`, SK: 'METADATA' },

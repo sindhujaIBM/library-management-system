@@ -3,7 +3,7 @@ import { adminClient } from '../../api/client';
 
 interface Alert {
   alertId: string;
-  type: 'demand_order' | 'stale_auction' | 'series_release';
+  type: 'demand_order' | 'stale_auction' | 'series_release' | 'series_missing';
   status: 'pending' | 'approved' | 'rejected';
   payload: Record<string, unknown>;
   generatedAt: string;
@@ -134,16 +134,63 @@ function SeriesReleaseCard({ p }: { p: Record<string, unknown> }) {
   );
 }
 
+interface MissingBook { title: string; isbn: string; publishedDate: string }
+
+function SeriesMissingCard({ p }: { p: Record<string, unknown> }) {
+  const seriesName = String(p.seriesName ?? '');
+  const author = String(p.author ?? '');
+  const catalogTitles = (p.catalogTitles as string[] | undefined) ?? [];
+  const missingBooks = (p.missingBooks as MissingBook[] | undefined) ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-lg font-semibold text-stone-900">{seriesName}</p>
+        <p className="text-sm text-stone-500">by {author}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-green-50 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-green-700">{catalogTitles.length}</p>
+          <p className="text-xs text-green-600 mt-0.5">in catalog</p>
+        </div>
+        <div className="bg-amber-50 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-amber-700">{missingBooks.length}</p>
+          <p className="text-xs text-amber-600 mt-0.5">not in catalog</p>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1.5">Missing from catalog</p>
+        <ul className="space-y-1">
+          {missingBooks.map(b => (
+            <li key={b.isbn} className="flex items-start gap-2 text-sm text-stone-700">
+              <span className="text-amber-500 mt-0.5">•</span>
+              <span>{b.title}{b.publishedDate ? <span className="text-stone-400 ml-1">({b.publishedDate.slice(0, 4)})</span> : null}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="text-xs text-stone-400 border-t border-stone-100 pt-3">
+        Currently in catalog: {catalogTitles.join(', ')}
+      </div>
+    </div>
+  );
+}
+
 function AlertPayload({ type, payload }: { type: Alert['type']; payload: Record<string, unknown> }) {
   if (type === 'demand_order') return <DemandOrderCard p={payload} />;
   if (type === 'stale_auction') return <StaleAuctionCard p={payload} />;
+  if (type === 'series_missing') return <SeriesMissingCard p={payload} />;
   return <SeriesReleaseCard p={payload} />;
 }
 
 const TYPE_BADGE: Record<string, { label: string; className: string }> = {
-  demand_order:   { label: '📦 Order More Copies',       className: 'bg-amber-100 text-amber-800' },
-  stale_auction:  { label: '🏷️ Consider Deaccessioning', className: 'bg-red-100 text-red-700' },
-  series_release: { label: '📚 New Series Release',       className: 'bg-blue-100 text-blue-700' },
+  demand_order:   { label: '📦 Order More Copies',         className: 'bg-amber-100 text-amber-800' },
+  stale_auction:  { label: '🏷️ Consider Deaccessioning',  className: 'bg-red-100 text-red-700' },
+  series_release: { label: '📚 New Series Release',         className: 'bg-blue-100 text-blue-700' },
+  series_missing: { label: '📖 Incomplete Series',          className: 'bg-purple-100 text-purple-800' },
 };
 
 export function AdminAlertsPage() {

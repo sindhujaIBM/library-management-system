@@ -1,5 +1,6 @@
 import { ScanCommand, QueryCommand, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { v4 as uuid } from 'uuid';
 import { getDynamo, TABLE } from '@library/shared';
 
 const ses = new SESClient({ region: 'us-east-1' });
@@ -7,6 +8,8 @@ const FROM = process.env.SES_FROM_EMAIL ?? 'noreply@maidlink.ca';
 const CONFIG_SET = process.env.SES_CONFIG_SET;
 const GOOGLE_BOOKS_KEY = process.env.GOOGLE_BOOKS_API_KEY ?? '';
 const NOTIF_TTL_DAYS = 365;
+// Books published within this window are treated as "new releases" → notify borrowers via SES
+const NEW_RELEASE_WINDOW_DAYS = 365;
 
 async function sendEmail(to: string, subject: string, body: string): Promise<void> {
   await ses.send(new SendEmailCommand({
@@ -29,10 +32,11 @@ interface GoogleVolume {
   };
 }
 
-async function fetchSeriesReleases(seriesName: string): Promise<GoogleVolume[]> {
-  const query = encodeURIComponent(`intitle:"${seriesName}"`);
+async function fetchSeriesVolumes(seriesName: string, author: string): Promise<GoogleVolume[]> {
+  // Include author to avoid matching unrelated books with similar titles
+  const q = encodeURIComponent(`intitle:"${seriesName}" inauthor:"${author}"`);
   const key = GOOGLE_BOOKS_KEY ? `&key=${GOOGLE_BOOKS_KEY}` : '';
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${query}&orderBy=newest&maxResults=10${key}`;
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=20${key}`;
   const res = await fetch(url);
   if (!res.ok) return [];
   const data = await res.json() as { items?: GoogleVolume[] };
@@ -41,8 +45,15 @@ async function fetchSeriesReleases(seriesName: string): Promise<GoogleVolume[]> 
 
 function extractISBN13(volume: GoogleVolume): string | null {
   const ids = volume.volumeInfo?.industryIdentifiers ?? [];
-  const isbn13 = ids.find(id => id.type === 'ISBN_13');
-  return isbn13?.identifier ?? null;
+  return ids.find(id => id.type === 'ISBN_13')?.identifier ?? null;
+}
+
+function isNewRelease(publishedDate: string | undefined): boolean {
+  if (!publishedDate) return false;
+  const published = new Date(publishedDate);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - NEW_RELEASE_WINDOW_DAYS);
+  return published >= cutoff;
 }
 
 export const handler = async (): Promise<void> => {
@@ -57,46 +68,96 @@ export const handler = async (): Promise<void> => {
       FilterExpression: 'entityType = :et AND attribute_exists(#series) AND #series <> :empty',
       ExpressionAttributeNames: { '#series': 'series' },
       ExpressionAttributeValues: { ':et': 'BOOK', ':empty': '' },
-      ProjectionExpression: 'ISBN, title, author, #series',
+      ProjectionExpression: 'ISBN, title, author, #series, seriesPosition',
       ExclusiveStartKey: lastKey,
     }));
     seriesBooks.push(...(result.Items ?? []));
     lastKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
   } while (lastKey);
 
-  // Group by series name → map of seriesName → list of ISBNs in our catalog
-  const seriesMap: Record<string, { isbn: string; title: string; author: string }[]> = {};
+  // Group by series name
+  const seriesMap: Record<string, { isbn: string; title: string; author: string; position?: number }[]> = {};
   for (const book of seriesBooks) {
     const s = book.series as string;
     if (!seriesMap[s]) seriesMap[s] = [];
-    seriesMap[s].push({ isbn: book.ISBN as string, title: book.title as string, author: book.author as string });
+    seriesMap[s].push({
+      isbn: book.ISBN as string,
+      title: book.title as string,
+      author: book.author as string,
+      position: book.seriesPosition as number | undefined,
+    });
   }
 
   console.log(`seriesReleaseAgent: checking ${Object.keys(seriesMap).length} series`);
 
-  let notificationsSent = 0;
+  let alertsCreated = 0;
+  let emailsSent = 0;
 
   for (const [seriesName, catalogEntries] of Object.entries(seriesMap)) {
     const catalogISBNs = new Set(catalogEntries.map(e => e.isbn));
+    const author = catalogEntries[0]?.author ?? '';
 
-    // Call Google Books API
+    // Weekly dedup: skip if we already ran this series check within 7 days
+    const dedupKey = { PK: `SERIESCHECK#${seriesName}`, SK: 'METADATA' };
+    const recentCheck = await db.send(new GetCommand({ TableName: TABLE, Key: dedupKey }));
+    if (recentCheck.Item) {
+      console.log(`seriesReleaseAgent: skipping "${seriesName}" — checked recently`);
+      continue;
+    }
+
     let volumes: GoogleVolume[];
     try {
-      volumes = await fetchSeriesReleases(seriesName);
+      volumes = await fetchSeriesVolumes(seriesName, author);
     } catch (err) {
       console.error(`seriesReleaseAgent: Google Books API error for "${seriesName}"`, err);
       continue;
     }
 
+    const missingBooks: { title: string; isbn: string; publishedDate: string }[] = [];
+    const newReleases: { title: string; isbn: string; publishedDate: string }[] = [];
+
     for (const vol of volumes) {
-      const newISBN = extractISBN13(vol);
-      if (!newISBN || catalogISBNs.has(newISBN)) continue; // already in our catalog
+      const isbn = extractISBN13(vol);
+      if (!isbn || catalogISBNs.has(isbn)) continue;
 
-      const newTitle = vol.volumeInfo?.title ?? 'Unknown Title';
-      const newAuthor = vol.volumeInfo?.authors?.[0] ?? catalogEntries[0]?.author ?? 'Unknown Author';
+      const title = vol.volumeInfo?.title ?? 'Unknown Title';
+      const publishedDate = vol.volumeInfo?.publishedDate ?? '';
 
-      // Find all users who ever borrowed any book in this series
-      const userEmails: Record<string, string> = {}; // userId → email
+      missingBooks.push({ title, isbn, publishedDate });
+      if (isNewRelease(publishedDate)) {
+        newReleases.push({ title, isbn, publishedDate });
+      }
+    }
+
+    // Write a single admin alert for this series if any books are missing from catalog
+    if (missingBooks.length > 0) {
+      const alertId = uuid();
+      await db.send(new PutCommand({
+        TableName: TABLE,
+        Item: {
+          PK: `ALERT#${alertId}`,
+          SK: 'METADATA',
+          entityType: 'ALERT',
+          alertId,
+          type: 'series_missing',
+          status: 'pending',
+          alertStatus: 'pending',
+          generatedAt: new Date().toISOString(),
+          payload: {
+            seriesName,
+            author,
+            catalogTitles: catalogEntries.map(e => e.title),
+            missingBooks,
+          },
+        },
+      }));
+      alertsCreated++;
+      console.log(`seriesReleaseAgent: alert created for "${seriesName}" — ${missingBooks.length} missing book(s)`);
+    }
+
+    // SES to borrowers only for genuine new releases (published within the last year)
+    if (newReleases.length > 0) {
+      const userEmails: Record<string, string> = {};
       for (const entry of catalogEntries) {
         const loansResult = await db.send(new QueryCommand({
           TableName: TABLE,
@@ -109,32 +170,35 @@ export const handler = async (): Promise<void> => {
         }
       }
 
-      // Send notification to each user, with dedup
-      for (const [userId, email] of Object.entries(userEmails)) {
-        const notifKey = { PK: `NOTIF#${userId}#${newISBN}`, SK: 'METADATA' };
+      for (const release of newReleases) {
+        for (const [userId, email] of Object.entries(userEmails)) {
+          const notifKey = { PK: `NOTIF#${userId}#${release.isbn}`, SK: 'METADATA' };
+          const existing = await db.send(new GetCommand({ TableName: TABLE, Key: notifKey }));
+          if (existing.Item) continue;
 
-        const existing = await db.send(new GetCommand({ TableName: TABLE, Key: notifKey }));
-        if (existing.Item) continue; // already notified
+          await sendEmail(
+            email,
+            `New release in the "${seriesName}" series`,
+            `Hi,\n\nA new book in the ${seriesName} series is available: "${release.title}" by ${author}.\n\nAsk your librarian to add it to the catalog, or request it at the front desk.\n\nHappy reading,\nLibrary Team`
+          );
 
-        await sendEmail(
-          email,
-          `New release in the "${seriesName}" series`,
-          `Hi,\n\nA new book in the ${seriesName} series is available: "${newTitle}" by ${newAuthor}.\n\nAsk your librarian to add it to the catalog, or request it at the front desk.\n\nHappy reading,\nLibrary Team`
-        );
-
-        // Write dedup record — TTL prevents it from accumulating forever
-        const ttl = Math.floor(Date.now() / 1000) + NOTIF_TTL_DAYS * 24 * 60 * 60;
-        await db.send(new PutCommand({
-          TableName: TABLE,
-          Item: { ...notifKey, entityType: 'NOTIF', userId, ISBN: newISBN, sentAt: new Date().toISOString(), ttl },
-        }));
-
-        notificationsSent++;
+          const ttl = Math.floor(Date.now() / 1000) + NOTIF_TTL_DAYS * 24 * 60 * 60;
+          await db.send(new PutCommand({
+            TableName: TABLE,
+            Item: { ...notifKey, entityType: 'NOTIF', userId, ISBN: release.isbn, sentAt: new Date().toISOString(), ttl },
+          }));
+          emailsSent++;
+        }
       }
-
-      console.log(`seriesReleaseAgent: new release "${newTitle}" (${newISBN}) in series "${seriesName}"`);
     }
+
+    // Mark this series as checked — TTL 8 days so the weekly EventBridge trigger doesn't re-alert
+    const ttl = Math.floor(Date.now() / 1000) + 8 * 24 * 60 * 60;
+    await db.send(new PutCommand({
+      TableName: TABLE,
+      Item: { ...dedupKey, entityType: 'SERIESCHECK', seriesName, checkedAt: new Date().toISOString(), ttl },
+    }));
   }
 
-  console.log(`seriesReleaseAgent: done — ${notificationsSent} notifications sent`);
+  console.log(`seriesReleaseAgent: done — ${alertsCreated} alerts created, ${emailsSent} emails sent`);
 };
