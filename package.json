@@ -23,6 +23,9 @@
     "seed:scenarios": "node scripts/seed-scenarios.mjs",
     "seed:alerts": "node scripts/seed-alerts.mjs",
     "make-librarian": "node scripts/make-librarian.mjs",
+    "push": "./push.sh",
+    "push:dry": "./push.sh --no-deploy",
+    "deploy": "./scripts/smart-deploy.sh",
     "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
